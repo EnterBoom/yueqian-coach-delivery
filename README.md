@@ -18,15 +18,11 @@ npm run dev
 - `db/schema.ts`、`drizzle/`：D1 数据结构与迁移。
 - `lib/policy.mjs`：分组权限和验收证据校验。
 
-## 用新的 GPT 账号重新部署
+## 当前部署
 
-1. 克隆本仓库，在 Codex 中打开项目。
-2. 安装或启用 Sites，要求它“读取 README，创建一个新的 Sites 项目并部署当前代码”。
-3. 将 Sites 运行变量 `INITIAL_OWNER_EMAIL` 设置为新负责人的 ChatGPT 登录邮箱。
-4. 保持站点为公开访问，业务数据仍由应用内成员邮箱和小组权限控制。
-5. 用负责人账号首次进入，创建真实营期，再录入教练、分组和学员。
+本仓库已绑定接管账号创建的新 Sites 项目。后续在 Codex 中打开本仓库，使用 Sites 构建并发布即可。
 
-`.openai/hosting.json` 已移除原站点的 `project_id`。新账号首次部署时必须创建自己的 Sites 项目，不要填回原项目 ID。
+生产运行变量 `INITIAL_OWNER_EMAIL` 当前设置为 `729685219@qq.com`。首次进入后由该负责人创建真实营期，再录入教练、分组和学员。
 
 ## 数据边界
 
