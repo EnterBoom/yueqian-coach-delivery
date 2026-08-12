@@ -61,3 +61,17 @@ test("signed-in email remains usable when Sites omits user id", async () => {
   assert.match(auth, /userId \?\? `email:\$\{email\.toLowerCase\(\)\}`/);
   assert.doesNotMatch(auth, /if \(!userId \|\| !email\) return null/);
 });
+
+test("each cohort has isolated delivery data and an internal manager", async () => {
+  const [route, schema, client] = await Promise.all([
+    readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /cohortId: integer\("cohort_id"\)/);
+  assert.match(route, /WHERE g\.cohort_id=\?/);
+  assert.match(route, /WHERE cohort_id=\? ORDER BY sort_order/);
+  assert.match(client, /营期管理/);
+  assert.match(client, /当前营期/);
+  assert.match(client, /创建并进入新营期/);
+});

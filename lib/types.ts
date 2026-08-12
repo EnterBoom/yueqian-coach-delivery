@@ -16,6 +16,7 @@ export type DeliveryException = { id: number; learner_id: number | null; learner
 export type WorkspaceSnapshot = {
   user: SiteUser & { role: Role };
   cohort: Cohort | null;
+  cohorts: Cohort[];
   groups: Group[];
   learners: Learner[];
   dayPlans: DayPlan[];

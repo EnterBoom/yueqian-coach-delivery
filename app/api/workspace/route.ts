@@ -83,12 +83,12 @@ async function authorize() {
 }
 
 async function groupForLearner(db: ReturnType<typeof getD1>, learnerId: number) {
-  return db.prepare("SELECT g.id,g.coach_email,l.name FROM learners l JOIN groups g ON g.id=l.group_id WHERE l.id=?")
-    .bind(learnerId).first<{ id: number; coach_email: string; name: string }>();
+  return db.prepare("SELECT g.id,g.cohort_id,g.coach_email,l.name FROM learners l JOIN groups g ON g.id=l.group_id WHERE l.id=?")
+    .bind(learnerId).first<{ id: number; cohort_id: number; coach_email: string; name: string }>();
 }
 
-async function requireGroupAccess(db: ReturnType<typeof getD1>, role: Role, email: string, groupId: number) {
-  const group = await db.prepare("SELECT id,coach_email FROM groups WHERE id=?").bind(groupId)
+async function requireGroupAccess(db: ReturnType<typeof getD1>, role: Role, email: string, groupId: number, cohortId: number) {
+  const group = await db.prepare("SELECT id,coach_email FROM groups WHERE id=? AND cohort_id=?").bind(groupId, cohortId)
     .first<{ id: number; coach_email: string }>();
   if (!group || !canAccessGroup(role, email, group.coach_email)) {
     throw Object.assign(new Error("你没有权限操作这个小组"), { status: 403 });
@@ -96,26 +96,42 @@ async function requireGroupAccess(db: ReturnType<typeof getD1>, role: Role, emai
   return group;
 }
 
-async function snapshot(): Promise<WorkspaceSnapshot> {
+async function availableCohorts(db: ReturnType<typeof getD1>, role: Role, email: string) {
+  return (role === "owner"
+    ? await db.prepare("SELECT id,name,pre_start_date,offline_start_date,post_start_date FROM cohorts ORDER BY id DESC").all()
+    : await db.prepare("SELECT DISTINCT c.id,c.name,c.pre_start_date,c.offline_start_date,c.post_start_date FROM cohorts c JOIN groups g ON g.cohort_id=c.id WHERE g.coach_email=? ORDER BY c.id DESC").bind(email).all()
+  ).results as WorkspaceSnapshot["cohorts"];
+}
+
+async function requireCohort(db: ReturnType<typeof getD1>, role: Role, email: string, requested?: number) {
+  const cohorts = await availableCohorts(db, role, email);
+  const cohort = requested ? cohorts.find((item) => item.id === requested) : cohorts[0];
+  if (requested && !cohort) throw Object.assign(new Error("你没有权限访问这个营期"), { status: 403 });
+  return { cohorts, cohort: cohort ?? null };
+}
+
+async function snapshot(requestedCohortId?: number): Promise<WorkspaceSnapshot> {
   const { db, user, member } = await authorize();
   const owner = member.role === "owner";
-  const cohort = await db.prepare("SELECT id,name,pre_start_date,offline_start_date,post_start_date FROM cohorts WHERE id=1").first();
+  const { cohorts, cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+  const members = owner ? await db.prepare("SELECT email,user_id,display_name,role FROM members ORDER BY role DESC,display_name").all() : { results: [] };
+  if (!cohort) return { user: { ...user, role: member.role }, cohort: null, cohorts, groups: [], learners: [], dayPlans: [], progress: [], exceptions: [], members: members.results as WorkspaceSnapshot["members"] };
+  const cohortId = cohort.id;
   const groupSql = owner
-    ? "SELECT g.id,g.name,g.coach_email,COUNT(l.id) learner_count FROM groups g LEFT JOIN learners l ON l.group_id=g.id GROUP BY g.id ORDER BY g.id"
-    : "SELECT g.id,g.name,g.coach_email,COUNT(l.id) learner_count FROM groups g LEFT JOIN learners l ON l.group_id=g.id WHERE g.coach_email=? GROUP BY g.id ORDER BY g.id";
+    ? "SELECT g.id,g.name,g.coach_email,COUNT(l.id) learner_count FROM groups g LEFT JOIN learners l ON l.group_id=g.id WHERE g.cohort_id=? GROUP BY g.id ORDER BY g.id"
+    : "SELECT g.id,g.name,g.coach_email,COUNT(l.id) learner_count FROM groups g LEFT JOIN learners l ON l.group_id=g.id WHERE g.cohort_id=? AND g.coach_email=? GROUP BY g.id ORDER BY g.id";
   const learnerSql = owner
-    ? "SELECT l.id,l.name,l.group_id,g.name group_name,l.note FROM learners l JOIN groups g ON g.id=l.group_id ORDER BY g.id,l.id"
-    : "SELECT l.id,l.name,l.group_id,g.name group_name,l.note FROM learners l JOIN groups g ON g.id=l.group_id WHERE g.coach_email=? ORDER BY g.id,l.id";
+    ? "SELECT l.id,l.name,l.group_id,g.name group_name,l.note FROM learners l JOIN groups g ON g.id=l.group_id WHERE g.cohort_id=? ORDER BY g.id,l.id"
+    : "SELECT l.id,l.name,l.group_id,g.name group_name,l.note FROM learners l JOIN groups g ON g.id=l.group_id WHERE g.cohort_id=? AND g.coach_email=? ORDER BY g.id,l.id";
   const progressSql = owner
-    ? "SELECT p.* FROM progress p JOIN learners l ON l.id=p.learner_id ORDER BY p.updated_at DESC"
-    : "SELECT p.* FROM progress p JOIN learners l ON l.id=p.learner_id JOIN groups g ON g.id=l.group_id WHERE g.coach_email=? ORDER BY p.updated_at DESC";
+    ? "SELECT p.* FROM progress p JOIN learners l ON l.id=p.learner_id JOIN groups g ON g.id=l.group_id WHERE g.cohort_id=? ORDER BY p.updated_at DESC"
+    : "SELECT p.* FROM progress p JOIN learners l ON l.id=p.learner_id JOIN groups g ON g.id=l.group_id WHERE g.cohort_id=? AND g.coach_email=? ORDER BY p.updated_at DESC";
   const exceptionSql = `${owner
-    ? "SELECT e.*,l.name learner_name,g.name group_name,d.label day_label FROM exceptions e LEFT JOIN learners l ON l.id=e.learner_id JOIN groups g ON g.id=e.group_id LEFT JOIN day_plans d ON d.id=e.day_plan_id"
-    : "SELECT e.*,l.name learner_name,g.name group_name,d.label day_label FROM exceptions e LEFT JOIN learners l ON l.id=e.learner_id JOIN groups g ON g.id=e.group_id LEFT JOIN day_plans d ON d.id=e.day_plan_id WHERE g.coach_email=?"} ORDER BY CASE e.status WHEN 'open' THEN 0 WHEN 'handling' THEN 1 ELSE 2 END,e.updated_at DESC`;
-  const bind = <T extends D1Row>(sql: string) => owner ? db.prepare(sql).all<T>() : db.prepare(sql).bind(user.email).all<T>();
-  const [groups, learners, dayPlans, progress, exceptions, members] = await Promise.all([
-    bind(groupSql), bind(learnerSql), db.prepare("SELECT * FROM day_plans ORDER BY sort_order").all(), bind(progressSql), bind(exceptionSql),
-    owner ? db.prepare("SELECT email,user_id,display_name,role FROM members ORDER BY role DESC,display_name").all() : Promise.resolve({ results: [] }),
+    ? "SELECT e.*,l.name learner_name,g.name group_name,d.label day_label FROM exceptions e LEFT JOIN learners l ON l.id=e.learner_id JOIN groups g ON g.id=e.group_id LEFT JOIN day_plans d ON d.id=e.day_plan_id WHERE g.cohort_id=?"
+    : "SELECT e.*,l.name learner_name,g.name group_name,d.label day_label FROM exceptions e LEFT JOIN learners l ON l.id=e.learner_id JOIN groups g ON g.id=e.group_id LEFT JOIN day_plans d ON d.id=e.day_plan_id WHERE g.cohort_id=? AND g.coach_email=?"} ORDER BY CASE e.status WHEN 'open' THEN 0 WHEN 'handling' THEN 1 ELSE 2 END,e.updated_at DESC`;
+  const bind = <T extends D1Row>(sql: string) => owner ? db.prepare(sql).bind(cohortId).all<T>() : db.prepare(sql).bind(cohortId, user.email).all<T>();
+  const [groups, learners, dayPlans, progress, exceptions] = await Promise.all([
+    bind(groupSql), bind(learnerSql), db.prepare("SELECT * FROM day_plans WHERE cohort_id=? ORDER BY sort_order").bind(cohortId).all(), bind(progressSql), bind(exceptionSql),
   ]);
   const exceptionRows = exceptions.results as D1Row[];
   const exceptionIds = exceptionRows.map((item: D1Row) => Number(item.id));
@@ -126,7 +142,8 @@ async function snapshot(): Promise<WorkspaceSnapshot> {
   }
   return {
     user: { ...user, role: member.role },
-    cohort: cohort as WorkspaceSnapshot["cohort"],
+    cohort,
+    cohorts,
     groups: groups.results as WorkspaceSnapshot["groups"],
     learners: learners.results as WorkspaceSnapshot["learners"],
     dayPlans: dayPlans.results as WorkspaceSnapshot["dayPlans"],
@@ -139,9 +156,10 @@ async function snapshot(): Promise<WorkspaceSnapshot> {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return json(await snapshot());
+    const requested = Number(new URL(request.url).searchParams.get("cohortId")) || undefined;
+    return json(await snapshot(requested));
   } catch (error) {
     const problem = error as Error & { status?: number };
     return json({ error: problem.message || "读取失败" }, problem.status ?? 500);
@@ -154,29 +172,33 @@ export async function POST(request: Request) {
     const body = await request.json() as Record<string, unknown>;
     const action = clean(body.action, 40);
     const owner = member.role === "owner";
+    const requestedCohortId = Number(body.cohortId) || undefined;
+    let responseCohortId = requestedCohortId;
 
     if (action === "initialize") {
-      if (!owner) throw Object.assign(new Error("只有项目方可以初始化营期"), { status: 403 });
-      if (await db.prepare("SELECT id FROM cohorts WHERE id=1").first()) throw new Error("营期已经初始化");
+      if (!owner) throw Object.assign(new Error("只有项目方可以创建营期"), { status: 403 });
       const name = clean(body.name, 80);
       if (!name) throw new Error("请填写营期名称");
       const preStart = requireDate(body.preStartDate, "线上前10天");
       const offlineStart = requireDate(body.offlineStartDate, "线下5天");
       const postStart = requireDate(body.postStartDate, "线上后10天");
       const rows = planRows(preStart, offlineStart, postStart);
-      await db.batch([
-        db.prepare("INSERT INTO cohorts (id,name,pre_start_date,offline_start_date,post_start_date,initialized_by) VALUES (1,?,?,?,?,?)")
-          .bind(name, preStart, offlineStart, postStart, user.email),
-        ...rows.map((row) => db.prepare("INSERT INTO day_plans (phase,day_number,label,title,goal,deliverable,acceptance,due_date,sort_order,configured) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(...row)),
-      ]);
+      const result = await db.prepare("INSERT INTO cohorts (name,pre_start_date,offline_start_date,post_start_date,initialized_by) VALUES (?,?,?,?,?)")
+        .bind(name, preStart, offlineStart, postStart, user.email).run();
+      responseCohortId = Number(result.meta.last_row_id);
+      await db.batch(rows.map((row) => db.prepare("INSERT INTO day_plans (cohort_id,phase,day_number,label,title,goal,deliverable,acceptance,due_date,sort_order,configured) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(responseCohortId, ...row)));
     } else if (action === "update_day") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       if (!owner) throw Object.assign(new Error("只有项目方可以编辑25天计划"), { status: 403 });
       const id = Number(body.id);
       const title = clean(body.title, 120);
       if (!id || !title) throw new Error("任务信息不完整");
-      await db.prepare("UPDATE day_plans SET title=?,goal=?,deliverable=?,acceptance=?,due_date=?,configured=1,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-        .bind(title, clean(body.goal), clean(body.deliverable), clean(body.acceptance), requireDate(body.dueDate, "任务"), id).run();
+      await db.prepare("UPDATE day_plans SET title=?,goal=?,deliverable=?,acceptance=?,due_date=?,configured=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND cohort_id=?")
+        .bind(title, clean(body.goal), clean(body.deliverable), clean(body.acceptance), requireDate(body.dueDate, "任务"), id, cohort.id).run();
     } else if (action === "add_coach_group") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       if (!owner) throw Object.assign(new Error("只有项目方可以管理教练和分组"), { status: 403 });
       const email = clean(body.email, 160).toLowerCase();
       const displayName = clean(body.displayName, 80);
@@ -186,44 +208,57 @@ export async function POST(request: Request) {
       if (existing?.role === "owner") throw new Error("项目负责人不能改为教练");
       await db.batch([
         db.prepare("INSERT INTO members (email,display_name,role) VALUES (?,?,'coach') ON CONFLICT(email) DO UPDATE SET display_name=excluded.display_name,updated_at=CURRENT_TIMESTAMP").bind(email, displayName),
-        db.prepare("INSERT INTO groups (name,coach_email) VALUES (?,?)").bind(groupName, email),
+        db.prepare("INSERT INTO groups (cohort_id,name,coach_email) VALUES (?,?,?)").bind(cohort.id, groupName, email),
       ]);
     } else if (action === "import_learners") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       if (!owner) throw Object.assign(new Error("只有项目方可以导入学员"), { status: 403 });
       const text = clean(body.text, 30000);
-      const groupRows = (await db.prepare("SELECT id,name FROM groups").all<{ id: number; name: string }>()).results as Array<{ id: number; name: string }>;
+      const groupRows = (await db.prepare("SELECT id,name FROM groups WHERE cohort_id=?").bind(cohort.id).all<{ id: number; name: string }>()).results as Array<{ id: number; name: string }>;
       if (!groupRows.length) throw new Error("请先创建教练和小组");
       const records = parseLearnerRows(text, Number(body.groupId) || null, groupRows);
       if (!records.length) throw new Error("没有可导入的学员");
       await db.batch(records.map((item) => db.prepare("INSERT OR IGNORE INTO learners (name,group_id,note) VALUES (?,?,?)").bind(item.name, item.groupId, item.note)));
     } else if (action === "update_progress") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       const learnerId = Number(body.learnerId);
       const dayPlanId = Number(body.dayPlanId);
       const learnerGroup = await groupForLearner(db, learnerId);
       if (!learnerGroup) throw new Error("学员不存在");
-      await requireGroupAccess(db, member.role, user.email, learnerGroup.id);
+      await requireGroupAccess(db, member.role, user.email, learnerGroup.id, cohort.id);
+      const day = await db.prepare("SELECT id FROM day_plans WHERE id=? AND cohort_id=?").bind(dayPlanId, cohort.id).first();
+      if (!day || learnerGroup.cohort_id !== cohort.id) throw new Error("学员与任务不属于当前营期");
       const { evidenceUrl, evidenceNote } = validateProgressEvidence(body.status, body.evidenceUrl, body.evidenceNote);
       await db.prepare("INSERT INTO progress (learner_id,day_plan_id,status,evidence_url,evidence_note,updated_by) VALUES (?,?,?,?,?,?) ON CONFLICT(learner_id,day_plan_id) DO UPDATE SET status=excluded.status,evidence_url=excluded.evidence_url,evidence_note=excluded.evidence_note,updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP")
         .bind(learnerId, dayPlanId, body.status, evidenceUrl, evidenceNote.slice(0, 2000), user.email).run();
     } else if (action === "create_exception") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       const learnerId = Number(body.learnerId);
       const learnerGroup = await groupForLearner(db, learnerId);
       if (!learnerGroup) throw new Error("请选择学员");
-      await requireGroupAccess(db, member.role, user.email, learnerGroup.id);
+      await requireGroupAccess(db, member.role, user.email, learnerGroup.id, cohort.id);
       const problem = clean(body.problem, 2000);
       const requested = clean(body.request, 2000);
       if (!problem || !requested) throw new Error("请填写问题和需要的支持");
+      const dayPlanId = Number(body.dayPlanId) || null;
+      if (dayPlanId && !await db.prepare("SELECT id FROM day_plans WHERE id=? AND cohort_id=?").bind(dayPlanId, cohort.id).first()) throw new Error("任务不属于当前营期");
       const result = await db.prepare("INSERT INTO exceptions (learner_id,group_id,day_plan_id,created_by,problem,request) VALUES (?,?,?,?,?,?)")
-        .bind(learnerId, learnerGroup.id, Number(body.dayPlanId) || null, user.email, problem, requested).run();
+        .bind(learnerId, learnerGroup.id, dayPlanId, user.email, problem, requested).run();
       await db.prepare("INSERT INTO exception_events (exception_id,actor_email,action,detail) VALUES (?,?,?,?)")
         .bind(result.meta.last_row_id, user.email, "created", requested).run();
     } else if (action === "update_exception") {
+      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
+      if (!cohort) throw new Error("请先创建营期");
       if (!owner) throw Object.assign(new Error("只有项目方可以处理异常"), { status: 403 });
       const id = Number(body.id);
       const status = clean(body.status, 30);
       const resolution = clean(body.resolution, 2000);
       if (!exceptionStatuses.includes(status)) throw new Error("异常状态不正确");
       if (status === "resolved" && !resolution) throw new Error("解决异常时必须填写处理结果");
+      if (!await db.prepare("SELECT e.id FROM exceptions e JOIN groups g ON g.id=e.group_id WHERE e.id=? AND g.cohort_id=?").bind(id, cohort.id).first()) throw new Error("异常不属于当前营期");
       await db.batch([
         db.prepare("UPDATE exceptions SET status=?,resolution=?,handled_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(status, resolution, user.email, id),
         db.prepare("INSERT INTO exception_events (exception_id,actor_email,action,detail) VALUES (?,?,?,?)").bind(id, user.email, status, resolution),
@@ -231,7 +266,7 @@ export async function POST(request: Request) {
     } else {
       throw new Error("未知操作");
     }
-    return json(await snapshot());
+    return json(await snapshot(responseCohortId));
   } catch (error) {
     const problem = error as Error & { status?: number };
     return json({ error: problem.message || "保存失败" }, problem.status ?? 400);

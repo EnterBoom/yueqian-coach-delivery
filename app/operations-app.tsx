@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { DayPlan, DeliveryException, Learner, ProgressStatus, WorkspaceSnapshot } from "@/lib/types";
 
-type Tab = "overview" | "learners" | "exceptions" | "plan" | "settings";
+type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings";
 
 const phaseMeta = {
   pre_online: { name: "线上前10天", short: "前置蓄能", tone: "coral" },
@@ -17,9 +17,9 @@ const statusMeta: Record<ProgressStatus, { label: string; className: string }> =
   passed: { label: "已通过", className: "green" },
 };
 
-async function api(action?: Record<string, unknown>) {
-  const response = await fetch("/api/workspace", action ? {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(action),
+async function api(action?: Record<string, unknown>, cohortId?: number) {
+  const response = await fetch(action ? "/api/workspace" : `/api/workspace${cohortId ? `?cohortId=${cohortId}` : ""}`, action ? {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...action, cohortId }),
   } : { cache: "no-store" });
   const data = await response.json() as WorkspaceSnapshot & { error?: string };
   if (!response.ok) throw new Error(data.error || "操作失败");
@@ -38,7 +38,7 @@ export function OperationsApp() {
   const [tab, setTab] = useState<Tab>("overview");
 
   const refresh = async () => {
-    try { setSnapshot(await api()); setError(""); } catch (problem) { setError((problem as Error).message); }
+    try { setSnapshot(await api(undefined, snapshot?.cohort?.id)); setError(""); } catch (problem) { setError((problem as Error).message); }
   };
   useEffect(() => {
     let active = true;
@@ -48,19 +48,20 @@ export function OperationsApp() {
 
   async function mutate(payload: Record<string, unknown>, message: string) {
     setBusy(true); setError(""); setNotice("");
-    try { setSnapshot(await api(payload)); setNotice(message); window.setTimeout(() => setNotice(""), 3500); return true; }
+    try { setSnapshot(await api(payload, snapshot?.cohort?.id)); setNotice(message); window.setTimeout(() => setNotice(""), 3500); return true; }
     catch (problem) { setError((problem as Error).message); return false; }
     finally { setBusy(false); }
   }
 
   if (error && !snapshot) return <div className="center-state"><div className="state-mark">!</div><h1>暂时无法进入作战台</h1><p>{error}</p><button onClick={refresh}>重新连接</button></div>;
   if (!snapshot) return <div className="center-state"><div className="spinner"/><p>正在连接交付数据…</p></div>;
-  if (!snapshot.cohort) return <Onboarding snapshot={snapshot} busy={busy} mutate={mutate} error={error}/>;
+  if (!snapshot.cohort && snapshot.user.role === "owner") return <Onboarding snapshot={snapshot} busy={busy} mutate={mutate} error={error}/>;
+  if (!snapshot.cohort) return <div className="center-state"><div className="state-mark">○</div><h1>暂未分配营期</h1><p>请联系项目负责人，把你添加到对应营期的小组。</p><button onClick={refresh}>刷新</button></div>;
 
   const nav: Array<[Tab, string, string]> = [
     ["overview", "01", "交付总览"], ["learners", "02", "学员推进"], ["exceptions", "03", "异常协同"], ["plan", "04", "25天计划"],
   ];
-  if (snapshot.user.role === "owner") nav.push(["settings", "05", "成员与分组"]);
+  if (snapshot.user.role === "owner") nav.push(["cohorts", "05", "营期管理"], ["settings", "06", "成员与分组"]);
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -69,13 +70,14 @@ export function OperationsApp() {
       <div className="sidebar-foot"><div className="avatar">{snapshot.user.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{snapshot.user.displayName}</strong><small>{snapshot.user.role === "owner" ? "项目负责人" : "带组教练"}</small></div></div>
     </aside>
     <main>
-      <header className="topbar"><button className="mobile-brand" onClick={() => setTab("overview")}>跃迁计划</button><div><span className="live-dot"/>营期协同中</div><div className="topbar-right"><span>{snapshot.cohort.name}</span><button onClick={refresh} aria-label="刷新数据">刷新</button></div></header>
+      <header className="topbar"><button className="mobile-brand" onClick={() => setTab("overview")}>跃迁计划</button><div><span className="live-dot"/>营期协同中</div><div className="topbar-right"><label className="cohort-switch"><span>当前营期</span><select value={snapshot.cohort.id} onChange={async (event) => { setBusy(true); try { setSnapshot(await api(undefined, Number(event.target.value))); setTab("overview"); setError(""); } catch (problem) { setError((problem as Error).message); } finally { setBusy(false); } }} disabled={busy}>{snapshot.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.name}</option>)}</select></label><button onClick={refresh} aria-label="刷新数据">刷新</button></div></header>
       {(notice || error) && <div className={`toast ${error ? "error" : "success"}`}>{error || notice}<button onClick={() => { setError(""); setNotice(""); }}>×</button></div>}
       <div className="page-wrap">
         {tab === "overview" && <Overview snapshot={snapshot} setTab={setTab}/>}
         {tab === "learners" && <Learners snapshot={snapshot} busy={busy} mutate={mutate}/>}
         {tab === "exceptions" && <Exceptions snapshot={snapshot} busy={busy} mutate={mutate}/>}
         {tab === "plan" && <Plan snapshot={snapshot} busy={busy} mutate={mutate}/>}
+        {tab === "cohorts" && snapshot.user.role === "owner" && <CohortManager snapshot={snapshot} busy={busy} mutate={mutate}/>}
         {tab === "settings" && snapshot.user.role === "owner" && <Settings snapshot={snapshot} busy={busy} mutate={mutate}/>}
       </div>
     </main>
@@ -145,6 +147,14 @@ function DayCard({ day, owner, busy, mutate }: { day: DayPlan; owner: boolean; b
   const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); if (await mutate({ action: "update_day", id: day.id, title: data.get("title"), goal: data.get("goal"), deliverable: data.get("deliverable"), acceptance: data.get("acceptance"), dueDate: data.get("dueDate") }, `${day.label} 已更新`)) setEditing(false); };
   if (editing) return <form className="day-card editing" onSubmit={submit}><div className="day-card-top"><b>{day.label}</b><button type="button" onClick={() => setEditing(false)}>取消</button></div><label>任务名称<input name="title" defaultValue={day.title} required/></label><label>今日唯一目标<textarea name="goal" defaultValue={day.goal}/></label><label>提交物<input name="deliverable" defaultValue={day.deliverable}/></label><label>验收标准<textarea name="acceptance" defaultValue={day.acceptance}/></label><label>截止日期<input name="dueDate" type="date" defaultValue={day.due_date} required/></label><button className="primary" disabled={busy}>保存这一天</button></form>;
   return <article className={`day-card ${day.configured ? "" : "unconfigured"}`}><div className="day-card-top"><b>{day.label}</b><time>{day.due_date.slice(5)}</time></div><h3>{day.title}</h3><p>{day.goal || "由项目方补充当天唯一目标"}</p><dl><div><dt>提交</dt><dd>{day.deliverable || "待配置"}</dd></div><div><dt>验收</dt><dd>{day.acceptance || "待配置"}</dd></div></dl>{owner && <button className="edit-button" onClick={() => setEditing(true)}>{day.configured ? "编辑任务" : "配置这一天"}</button>}</article>;
+}
+
+function CohortManager({ snapshot, busy, mutate }: { snapshot: WorkspaceSnapshot; busy: boolean; mutate: (p: Record<string, unknown>, m: string) => Promise<boolean> }) {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
+    if (await mutate({ action: "initialize", name: data.get("name"), preStartDate: data.get("preStartDate"), offlineStartDate: data.get("offlineStartDate"), postStartDate: data.get("postStartDate") }, "新营期已创建并切换")) form.reset();
+  };
+  return <section className="content-page"><PageTitle kicker="COHORT CONTROL" title="营期管理" detail="每个营期独立保存小组、学员、25天任务、进度和异常。新建后自动切换，旧期仍可从顶部选择回看。"/><div className="cohort-layout"><form className="settings-card cohort-create" onSubmit={submit}><span className="card-number">NEW COHORT</span><h2>创建新营期</h2><label>营期名称<input name="name" required placeholder="例如：跃迁计划 · 2026 冬季营"/></label><div className="date-grid"><label>线上前10天开始<input name="preStartDate" type="date" required/></label><label>线下5天开始<input name="offlineStartDate" type="date" required/></label><label>线上后10天开始<input name="postStartDate" type="date" required/></label></div><button className="primary" disabled={busy}>{busy ? "正在创建…" : "创建并进入新营期"}</button></form><div className="cohort-list"><div className="section-head"><div><span className="kicker">COHORT ARCHIVE</span><h2>全部营期</h2></div><b>{snapshot.cohorts.length} 期</b></div>{snapshot.cohorts.map((cohort) => <article key={cohort.id} className={cohort.id === snapshot.cohort?.id ? "active" : ""}><div><strong>{cohort.name}</strong><small>{cohort.pre_start_date} → {cohort.post_start_date}</small></div><span>{cohort.id === snapshot.cohort?.id ? "当前营期" : "顶部可切换"}</span></article>)}</div></div></section>;
 }
 
 function Settings({ snapshot, busy, mutate }: { snapshot: WorkspaceSnapshot; busy: boolean; mutate: (p: Record<string, unknown>, m: string) => Promise<boolean> }) {

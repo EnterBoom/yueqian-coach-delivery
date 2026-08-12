@@ -15,7 +15,7 @@ export const members = sqliteTable("members", {
 }, (table) => [uniqueIndex("idx_members_user_id").on(table.userId)]);
 
 export const cohorts = sqliteTable("cohorts", {
-  id: integer("id").primaryKey(),
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   preStartDate: text("pre_start_date").notNull(),
   offlineStartDate: text("offline_start_date").notNull(),
@@ -26,11 +26,13 @@ export const cohorts = sqliteTable("cohorts", {
 
 export const groups = sqliteTable("groups", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  cohortId: integer("cohort_id").notNull().references(() => cohorts.id),
   name: text("name").notNull(),
   coachEmail: text("coach_email").notNull(),
   ...timestamps,
 }, (table) => [
-  uniqueIndex("idx_groups_name").on(table.name),
+  uniqueIndex("idx_groups_cohort_name").on(table.cohortId, table.name),
+  index("idx_groups_cohort_id").on(table.cohortId),
   index("idx_groups_coach_email").on(table.coachEmail),
 ]);
 
@@ -47,6 +49,7 @@ export const learners = sqliteTable("learners", {
 
 export const dayPlans = sqliteTable("day_plans", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  cohortId: integer("cohort_id").notNull().references(() => cohorts.id),
   phase: text("phase", { enum: ["pre_online", "offline_camp", "post_online"] }).notNull(),
   dayNumber: integer("day_number").notNull(),
   label: text("label").notNull(),
@@ -59,8 +62,9 @@ export const dayPlans = sqliteTable("day_plans", {
   configured: integer("configured", { mode: "boolean" }).notNull().default(false),
   ...timestamps,
 }, (table) => [
-  uniqueIndex("idx_day_plans_phase_day").on(table.phase, table.dayNumber),
-  uniqueIndex("idx_day_plans_sort_order").on(table.sortOrder),
+  uniqueIndex("idx_day_plans_cohort_phase_day").on(table.cohortId, table.phase, table.dayNumber),
+  uniqueIndex("idx_day_plans_cohort_sort_order").on(table.cohortId, table.sortOrder),
+  index("idx_day_plans_cohort_id").on(table.cohortId),
 ]);
 
 export const progress = sqliteTable("progress", {
