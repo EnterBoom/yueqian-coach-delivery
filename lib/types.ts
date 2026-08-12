@@ -1,0 +1,25 @@
+export type Role = "owner" | "coach";
+export type Phase = "pre_online" | "offline_camp" | "post_online";
+export type ProgressStatus = "not_started" | "in_progress" | "needs_revision" | "passed";
+export type ExceptionStatus = "open" | "handling" | "resolved";
+
+export type SiteUser = { userId: string; email: string; displayName: string };
+export type Member = { email: string; user_id: string | null; display_name: string; role: Role };
+export type Cohort = { id: number; name: string; pre_start_date: string; offline_start_date: string; post_start_date: string };
+export type Group = { id: number; name: string; coach_email: string; learner_count: number };
+export type Learner = { id: number; name: string; group_id: number; group_name: string; note: string };
+export type DayPlan = { id: number; phase: Phase; day_number: number; label: string; title: string; goal: string; deliverable: string; acceptance: string; due_date: string; sort_order: number; configured: number };
+export type Progress = { id: number; learner_id: number; day_plan_id: number; status: ProgressStatus; evidence_url: string; evidence_note: string; updated_by: string; updated_at: string };
+export type ExceptionEvent = { id: number; exception_id: number; actor_email: string; action: string; detail: string; created_at: string };
+export type DeliveryException = { id: number; learner_id: number | null; learner_name: string | null; group_id: number; group_name: string; day_plan_id: number | null; day_label: string | null; created_by: string; problem: string; request: string; status: ExceptionStatus; resolution: string; handled_by: string | null; created_at: string; updated_at: string; events: ExceptionEvent[] };
+
+export type WorkspaceSnapshot = {
+  user: SiteUser & { role: Role };
+  cohort: Cohort | null;
+  groups: Group[];
+  learners: Learner[];
+  dayPlans: DayPlan[];
+  progress: Progress[];
+  exceptions: DeliveryException[];
+  members: Member[];
+};
