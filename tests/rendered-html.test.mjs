@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { assertCohortWritable, canAccessGroup, normalizeHttpsUrl, validateProgressEvidence } from "../lib/policy.mjs";
 import { parseLearnerRows } from "../lib/import-learners.mjs";
+import { defaultDayId } from "../lib/day-view.mjs";
 
 test("group authorization is enforced at the shared boundary", () => {
   assert.equal(canAccessGroup("owner", "owner@example.com", "coach@example.com"), true);
@@ -87,4 +88,19 @@ test("archived cohorts are read-only at the shared server boundary", async () =>
   assert.match(route, /只有项目方可以变更营期状态/);
   assert.match(client, /已归档 · 只读/);
   assert.match(client, /window\.confirm/);
+});
+
+test("route day selection defaults to the calendar and drives the overview", async () => {
+  const days = [
+    { id: 1, due_date: "2026-08-12" },
+    { id: 2, due_date: "2026-08-13" },
+  ];
+  assert.equal(defaultDayId(days, "2026-08-12"), 1);
+  assert.equal(defaultDayId(days, "2026-08-11"), 1);
+  assert.equal(defaultDayId(days, "2026-08-20"), 2);
+  const client = await readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8");
+  assert.match(client, /aria-pressed=\{day\.id === current\.id\}/);
+  assert.match(client, /点击日期，预览对应作战面/);
+  assert.match(client, /当日通过率/);
+  assert.match(client, /setSelectedDayId\(null\)/);
 });

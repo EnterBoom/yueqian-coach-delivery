@@ -74,6 +74,8 @@ main { grid-column: 2; min-width: 0; }
 .hero-panel h1 { margin: 17px 0 13px; font-size: clamp(38px, 5vw, 66px); line-height: .92; letter-spacing: -.065em; font-weight: 780; }
 .hero-panel h1 span { color: #69717a; font-weight: 480; font-size: .52em; letter-spacing: -.035em; }
 .hero-panel p { color: #616a73; max-width: 580px; line-height: 1.7; font-size: 13px; }
+.command-kicker { display: flex; align-items: center; gap: 12px; }
+.command-kicker button { border: 0; border-bottom: 1px solid #a7acae; padding: 2px 0; background: transparent; color: #68717a; font-size: 9px; }
 .hero-actions { display: flex; gap: 10px; margin-top: 26px; }
 .today-card { background: var(--navy); color: white; padding: 42px 38px; display: flex; flex-direction: column; justify-content: space-between; }
 .phase-tag { justify-self: start; display: inline-flex; width: max-content; border-radius: 99px; padding: 6px 10px; font-size: 10px; font-weight: 760; }
@@ -109,11 +111,13 @@ main { grid-column: 2; min-width: 0; }
 .route-phase header span, .route-phase header b { color: #899098; font-size: 9px; font-weight: 500; }
 .route-phase > div { display: grid; grid-template-columns: repeat(10,1fr); gap: 5px; margin-top: 22px; }
 .route-phase.violet > div { grid-template-columns: repeat(5,1fr); }
-.route-phase > div span { height: 28px; display: grid; place-items: center; border-radius: 4px; background: #ececea; color: #9b9b96; font-family: var(--font-geist-mono); font-size: 9px; }
-.route-phase.coral > div span.configured { background: rgba(240,111,79,.13); color: #c3563c; }
-.route-phase.violet > div span.configured { background: rgba(122,106,216,.13); color: #6455bf; }
-.route-phase.teal > div span.configured { background: rgba(67,168,159,.13); color: #26877f; }
-.route-phase > div span.today { outline: 2px solid var(--navy); outline-offset: 2px; color: var(--navy); font-weight: 800; }
+.route-phase > div button { height: 28px; border: 0; display: grid; place-items: center; border-radius: 4px; background: #ececea; color: #9b9b96; font-family: var(--font-geist-mono); font-size: 9px; }
+.route-phase > div button:hover { transform: translateY(-1px); filter: brightness(.97); }
+.route-phase.coral > div button.configured { background: rgba(240,111,79,.13); color: #c3563c; }
+.route-phase.violet > div button.configured { background: rgba(122,106,216,.13); color: #6455bf; }
+.route-phase.teal > div button.configured { background: rgba(67,168,159,.13); color: #26877f; }
+.route-phase > div button.today { box-shadow: inset 0 -2px var(--navy); font-weight: 800; }
+.route-phase > div button.selected { outline: 2px solid var(--navy); outline-offset: 2px; color: var(--navy); font-weight: 800; }
 .group-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
 .group-grid article { background: var(--white); border: 1px solid #dadbd8; padding: 21px; }
 .group-title { display: flex; gap: 11px; align-items: center; }
