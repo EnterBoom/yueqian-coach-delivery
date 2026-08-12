@@ -3,6 +3,7 @@ import { getSiteUser } from "@/lib/site-auth";
 import { parseLearnerRows } from "@/lib/import-learners.mjs";
 import type { Member, Phase, Role, WorkspaceSnapshot } from "@/lib/types";
 import {
+  assertCohortWritable,
   canAccessGroup,
   exceptionStatuses,
   validateProgressEvidence,
@@ -98,8 +99,8 @@ async function requireGroupAccess(db: ReturnType<typeof getD1>, role: Role, emai
 
 async function availableCohorts(db: ReturnType<typeof getD1>, role: Role, email: string) {
   return (role === "owner"
-    ? await db.prepare("SELECT id,name,pre_start_date,offline_start_date,post_start_date FROM cohorts ORDER BY id DESC").all()
-    : await db.prepare("SELECT DISTINCT c.id,c.name,c.pre_start_date,c.offline_start_date,c.post_start_date FROM cohorts c JOIN groups g ON g.cohort_id=c.id WHERE g.coach_email=? ORDER BY c.id DESC").bind(email).all()
+    ? await db.prepare("SELECT id,name,pre_start_date,offline_start_date,post_start_date,status,archived_at,archived_by FROM cohorts ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END,id DESC").all()
+    : await db.prepare("SELECT DISTINCT c.id,c.name,c.pre_start_date,c.offline_start_date,c.post_start_date,c.status,c.archived_at,c.archived_by FROM cohorts c JOIN groups g ON g.cohort_id=c.id WHERE g.coach_email=? ORDER BY CASE c.status WHEN 'active' THEN 0 ELSE 1 END,c.id DESC").bind(email).all()
   ).results as WorkspaceSnapshot["cohorts"];
 }
 
@@ -174,6 +175,13 @@ export async function POST(request: Request) {
     const owner = member.role === "owner";
     const requestedCohortId = Number(body.cohortId) || undefined;
     let responseCohortId = requestedCohortId;
+    let writableCohort: WorkspaceSnapshot["cohort"] = null;
+    if (!["initialize", "archive_cohort", "reopen_cohort"].includes(action)) {
+      writableCohort = (await requireCohort(db, member.role, user.email, requestedCohortId)).cohort;
+      if (!writableCohort) throw new Error("请先创建营期");
+      try { assertCohortWritable(writableCohort.status); }
+      catch (error) { throw Object.assign(error as Error, { status: 409 }); }
+    }
 
     if (action === "initialize") {
       if (!owner) throw Object.assign(new Error("只有项目方可以创建营期"), { status: 403 });
@@ -187,9 +195,19 @@ export async function POST(request: Request) {
         .bind(name, preStart, offlineStart, postStart, user.email).run();
       responseCohortId = Number(result.meta.last_row_id);
       await db.batch(rows.map((row) => db.prepare("INSERT INTO day_plans (cohort_id,phase,day_number,label,title,goal,deliverable,acceptance,due_date,sort_order,configured) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(responseCohortId, ...row)));
-    } else if (action === "update_day") {
+    } else if (action === "archive_cohort" || action === "reopen_cohort") {
+      if (!owner) throw Object.assign(new Error("只有项目方可以变更营期状态"), { status: 403 });
       const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      if (!cohort) throw new Error("营期不存在");
+      if (action === "archive_cohort") {
+        await db.prepare("UPDATE cohorts SET status='archived',archived_at=CURRENT_TIMESTAMP,archived_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+          .bind(user.email, cohort.id).run();
+      } else {
+        await db.prepare("UPDATE cohorts SET status='active',archived_at=NULL,archived_by=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?")
+          .bind(cohort.id).run();
+      }
+    } else if (action === "update_day") {
+      const cohort = writableCohort!;
       if (!owner) throw Object.assign(new Error("只有项目方可以编辑25天计划"), { status: 403 });
       const id = Number(body.id);
       const title = clean(body.title, 120);
@@ -197,8 +215,7 @@ export async function POST(request: Request) {
       await db.prepare("UPDATE day_plans SET title=?,goal=?,deliverable=?,acceptance=?,due_date=?,configured=1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND cohort_id=?")
         .bind(title, clean(body.goal), clean(body.deliverable), clean(body.acceptance), requireDate(body.dueDate, "任务"), id, cohort.id).run();
     } else if (action === "add_coach_group") {
-      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      const cohort = writableCohort!;
       if (!owner) throw Object.assign(new Error("只有项目方可以管理教练和分组"), { status: 403 });
       const email = clean(body.email, 160).toLowerCase();
       const displayName = clean(body.displayName, 80);
@@ -211,8 +228,7 @@ export async function POST(request: Request) {
         db.prepare("INSERT INTO groups (cohort_id,name,coach_email) VALUES (?,?,?)").bind(cohort.id, groupName, email),
       ]);
     } else if (action === "import_learners") {
-      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      const cohort = writableCohort!;
       if (!owner) throw Object.assign(new Error("只有项目方可以导入学员"), { status: 403 });
       const text = clean(body.text, 30000);
       const groupRows = (await db.prepare("SELECT id,name FROM groups WHERE cohort_id=?").bind(cohort.id).all<{ id: number; name: string }>()).results as Array<{ id: number; name: string }>;
@@ -221,8 +237,7 @@ export async function POST(request: Request) {
       if (!records.length) throw new Error("没有可导入的学员");
       await db.batch(records.map((item) => db.prepare("INSERT OR IGNORE INTO learners (name,group_id,note) VALUES (?,?,?)").bind(item.name, item.groupId, item.note)));
     } else if (action === "update_progress") {
-      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      const cohort = writableCohort!;
       const learnerId = Number(body.learnerId);
       const dayPlanId = Number(body.dayPlanId);
       const learnerGroup = await groupForLearner(db, learnerId);
@@ -234,8 +249,7 @@ export async function POST(request: Request) {
       await db.prepare("INSERT INTO progress (learner_id,day_plan_id,status,evidence_url,evidence_note,updated_by) VALUES (?,?,?,?,?,?) ON CONFLICT(learner_id,day_plan_id) DO UPDATE SET status=excluded.status,evidence_url=excluded.evidence_url,evidence_note=excluded.evidence_note,updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP")
         .bind(learnerId, dayPlanId, body.status, evidenceUrl, evidenceNote.slice(0, 2000), user.email).run();
     } else if (action === "create_exception") {
-      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      const cohort = writableCohort!;
       const learnerId = Number(body.learnerId);
       const learnerGroup = await groupForLearner(db, learnerId);
       if (!learnerGroup) throw new Error("请选择学员");
@@ -250,8 +264,7 @@ export async function POST(request: Request) {
       await db.prepare("INSERT INTO exception_events (exception_id,actor_email,action,detail) VALUES (?,?,?,?)")
         .bind(result.meta.last_row_id, user.email, "created", requested).run();
     } else if (action === "update_exception") {
-      const { cohort } = await requireCohort(db, member.role, user.email, requestedCohortId);
-      if (!cohort) throw new Error("请先创建营期");
+      const cohort = writableCohort!;
       if (!owner) throw Object.assign(new Error("只有项目方可以处理异常"), { status: 403 });
       const id = Number(body.id);
       const status = clean(body.status, 30);

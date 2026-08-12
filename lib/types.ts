@@ -5,7 +5,7 @@ export type ExceptionStatus = "open" | "handling" | "resolved";
 
 export type SiteUser = { userId: string; email: string; displayName: string };
 export type Member = { email: string; user_id: string | null; display_name: string; role: Role };
-export type Cohort = { id: number; name: string; pre_start_date: string; offline_start_date: string; post_start_date: string };
+export type Cohort = { id: number; name: string; pre_start_date: string; offline_start_date: string; post_start_date: string; status: "active" | "archived"; archived_at: string | null; archived_by: string | null };
 export type Group = { id: number; name: string; coach_email: string; learner_count: number };
 export type Learner = { id: number; name: string; group_id: number; group_name: string; note: string };
 export type DayPlan = { id: number; phase: Phase; day_number: number; label: string; title: string; goal: string; deliverable: string; acceptance: string; due_date: string; sort_order: number; configured: number };

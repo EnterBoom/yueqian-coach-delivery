@@ -48,6 +48,7 @@ main { grid-column: 2; min-width: 0; }
 .topbar { height: 68px; padding: 0 40px; background: rgba(244,242,237,.94); border-bottom: 1px solid #dededb; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; backdrop-filter: blur(12px); z-index: 20; font-size: 11px; color: #68717a; }
 .topbar > div { display: flex; align-items: center; gap: 8px; }
 .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #42a578; box-shadow: 0 0 0 4px rgba(66,165,120,.12); }
+.live-dot.archived { background: #92979b; box-shadow: 0 0 0 4px rgba(120,126,132,.12); }
 .cohort-switch { display: flex; align-items: center; gap: 8px; font-size: 9px; font-weight: 500; }
 .cohort-switch span { color: #8a9096; white-space: nowrap; }
 .cohort-switch select { width: min(260px, 30vw); padding: 7px 30px 7px 10px; border-radius: 7px; font-size: 10px; }
@@ -58,6 +59,8 @@ main { grid-column: 2; min-width: 0; }
 .toast.success { background: #2d8664; }
 .toast.error { background: #b84b3b; }
 .toast button { color: white; background: transparent; border: 0; padding-left: 18px; }
+.read-only-banner { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding: 13px 17px; border: 1px solid #d6d7d4; background: #e9e8e3; color: #626971; font-size: 10px; }
+.read-only-banner strong { color: var(--ink); white-space: nowrap; }
 
 .eyebrow, .kicker { font-family: var(--font-geist-mono); letter-spacing: .16em; text-transform: uppercase; font-size: 9px; color: var(--coral); font-weight: 750; }
 .primary, .ghost, .text-button, .save-button, .edit-button, .exception-handle button { border: 0; border-radius: 9px; font-weight: 700; }
@@ -204,6 +207,7 @@ i.green { background: var(--green); } i.amber { background: var(--amber); } i.bl
 .settings-card h2 { margin: 0; font-size: 19px; }
 .settings-card p { color: #757c82; font-size: 10px; line-height: 1.6; }
 .settings-card .primary { justify-self: start; }
+.settings-card fieldset { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; gap: 14px; }
 .cohort-layout { display: grid; grid-template-columns: minmax(320px,.8fr) 1.2fr; gap: 18px; align-items: start; }
 .cohort-create { position: sticky; top: 100px; }
 .cohort-list { display: grid; }
@@ -211,9 +215,14 @@ i.green { background: var(--green); } i.amber { background: var(--amber); } i.bl
 .cohort-list article { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 18px 20px; background: var(--white); border: 1px solid #dedfdd; border-bottom: 0; }
 .cohort-list article:last-child { border-bottom: 1px solid #dedfdd; }
 .cohort-list article.active { border-left: 4px solid var(--coral); background: #fff8f4; }
+.cohort-list article.archived { background: #efeee9; }
 .cohort-list article div { display: grid; gap: 5px; }
 .cohort-list article strong { font-size: 13px; }
 .cohort-list article small, .cohort-list article > span { color: #858c92; font-size: 9px; }
+.cohort-actions { justify-items: end; }
+.cohort-actions > span { color: #858c92; font-size: 9px; }
+.cohort-actions button { border: 1px solid #d3d5d3; border-radius: 7px; padding: 7px 10px; background: transparent; color: #59636c; font-size: 9px; }
+.cohort-list article.active .cohort-actions > span { color: #c3563c; font-weight: 750; }
 .member-table { margin-top: 34px; }
 .member-table > div:not(.section-head) { display: grid; grid-template-columns: 40px 160px 1fr auto; align-items: center; background: var(--white); border: 1px solid #dedfdd; border-bottom: 0; padding: 11px 14px; }
 .member-table > div:last-child { border-bottom: 1px solid #dedfdd; }
@@ -309,6 +318,7 @@ i.green { background: var(--green); } i.amber { background: var(--amber); } i.bl
   .cohort-create { position: static; }
   .cohort-switch span { display: none; }
   .cohort-switch select { width: min(180px, 43vw); }
+  .read-only-banner { align-items: start; flex-direction: column; gap: 4px; }
   .member-table > div:not(.section-head) { grid-template-columns: 38px 1fr auto; }
   .member-table small { grid-column: 2; }
   .member-table b { grid-column: 3; grid-row: 1/3; }

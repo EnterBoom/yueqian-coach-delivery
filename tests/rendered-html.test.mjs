@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { canAccessGroup, normalizeHttpsUrl, validateProgressEvidence } from "../lib/policy.mjs";
+import { assertCohortWritable, canAccessGroup, normalizeHttpsUrl, validateProgressEvidence } from "../lib/policy.mjs";
 import { parseLearnerRows } from "../lib/import-learners.mjs";
 
 test("group authorization is enforced at the shared boundary", () => {
@@ -74,4 +74,17 @@ test("each cohort has isolated delivery data and an internal manager", async () 
   assert.match(client, /营期管理/);
   assert.match(client, /当前营期/);
   assert.match(client, /创建并进入新营期/);
+});
+
+test("archived cohorts are read-only at the shared server boundary", async () => {
+  assert.doesNotThrow(() => assertCohortWritable("active"));
+  assert.throws(() => assertCohortWritable("archived"), /只能查看历史数据/);
+  const [route, client] = await Promise.all([
+    readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(route, /\["initialize", "archive_cohort", "reopen_cohort"\]/);
+  assert.match(route, /只有项目方可以变更营期状态/);
+  assert.match(client, /已归档 · 只读/);
+  assert.match(client, /window\.confirm/);
 });

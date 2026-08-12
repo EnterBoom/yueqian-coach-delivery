@@ -20,6 +20,9 @@ export const cohorts = sqliteTable("cohorts", {
   preStartDate: text("pre_start_date").notNull(),
   offlineStartDate: text("offline_start_date").notNull(),
   postStartDate: text("post_start_date").notNull(),
+  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  archivedAt: text("archived_at"),
+  archivedBy: text("archived_by"),
   initializedBy: text("initialized_by").notNull(),
   ...timestamps,
 });

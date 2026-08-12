@@ -15,6 +15,13 @@
       "when": 1786516774556,
       "tag": "0001_late_dagger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786526912860,
+      "tag": "0002_fresh_skaar",
+      "breakpoints": true
     }
   ]
 }

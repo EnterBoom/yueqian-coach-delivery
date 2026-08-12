@@ -20,7 +20,7 @@ export function ensureSchema() {
   const statements = [
     `CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, user_id TEXT, display_name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','coach')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_members_user_id ON members(user_id) WHERE user_id IS NOT NULL`,
-    `CREATE TABLE IF NOT EXISTS cohorts (id INTEGER PRIMARY KEY, name TEXT NOT NULL, pre_start_date TEXT NOT NULL, offline_start_date TEXT NOT NULL, post_start_date TEXT NOT NULL, initialized_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS cohorts (id INTEGER PRIMARY KEY, name TEXT NOT NULL, pre_start_date TEXT NOT NULL, offline_start_date TEXT NOT NULL, post_start_date TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived')), archived_at TEXT, archived_by TEXT, initialized_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, cohort_id INTEGER NOT NULL REFERENCES cohorts(id), name TEXT NOT NULL, coach_email TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS learners (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, group_id INTEGER NOT NULL REFERENCES groups(id), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_learners_group_name ON learners(group_id, name)`,
@@ -38,8 +38,12 @@ export function ensureSchema() {
     await db.batch(statements.map((statement) => db.prepare(statement)));
     const groupColumns = (await db.prepare("PRAGMA table_info(groups)").all<{ name: string }>()).results;
     const dayColumns = (await db.prepare("PRAGMA table_info(day_plans)").all<{ name: string }>()).results;
+    const cohortColumns = (await db.prepare("PRAGMA table_info(cohorts)").all<{ name: string }>()).results;
     if (!groupColumns.some((column) => column.name === "cohort_id")) await db.prepare("ALTER TABLE groups ADD COLUMN cohort_id INTEGER REFERENCES cohorts(id)").run();
     if (!dayColumns.some((column) => column.name === "cohort_id")) await db.prepare("ALTER TABLE day_plans ADD COLUMN cohort_id INTEGER REFERENCES cohorts(id)").run();
+    if (!cohortColumns.some((column) => column.name === "status")) await db.prepare("ALTER TABLE cohorts ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived'))").run();
+    if (!cohortColumns.some((column) => column.name === "archived_at")) await db.prepare("ALTER TABLE cohorts ADD COLUMN archived_at TEXT").run();
+    if (!cohortColumns.some((column) => column.name === "archived_by")) await db.prepare("ALTER TABLE cohorts ADD COLUMN archived_by TEXT").run();
     await db.batch([
       db.prepare("UPDATE groups SET cohort_id=(SELECT id FROM cohorts ORDER BY id LIMIT 1) WHERE cohort_id IS NULL"),
       db.prepare("UPDATE day_plans SET cohort_id=(SELECT id FROM cohorts ORDER BY id LIMIT 1) WHERE cohort_id IS NULL"),
