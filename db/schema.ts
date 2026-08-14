@@ -57,18 +57,40 @@ export const dayPlans = sqliteTable("day_plans", {
   dayNumber: integer("day_number").notNull(),
   label: text("label").notNull(),
   title: text("title").notNull(),
+  coachAction: text("coach_action").notNull().default(""),
+  groupAnnouncement: text("group_announcement").notNull().default(""),
+  materials: text("materials").notNull().default(""),
+  learnerInstructions: text("learner_instructions").notNull().default(""),
+  reminder: text("reminder").notNull().default(""),
   goal: text("goal").notNull().default(""),
   deliverable: text("deliverable").notNull().default(""),
   acceptance: text("acceptance").notNull().default(""),
   dueDate: text("due_date").notNull(),
   sortOrder: integer("sort_order").notNull(),
   configured: integer("configured", { mode: "boolean" }).notNull().default(false),
+  hasUnpublishedChanges: integer("has_unpublished_changes", { mode: "boolean" }).notNull().default(false),
   ...timestamps,
 }, (table) => [
   uniqueIndex("idx_day_plans_cohort_phase_day").on(table.cohortId, table.phase, table.dayNumber),
   uniqueIndex("idx_day_plans_cohort_sort_order").on(table.cohortId, table.sortOrder),
   index("idx_day_plans_cohort_id").on(table.cohortId),
 ]);
+
+export const dayPlanPublications = sqliteTable("day_plan_publications", {
+  dayPlanId: integer("day_plan_id").primaryKey().references(() => dayPlans.id),
+  title: text("title").notNull(),
+  coachAction: text("coach_action").notNull().default(""),
+  groupAnnouncement: text("group_announcement").notNull().default(""),
+  materials: text("materials").notNull().default(""),
+  learnerInstructions: text("learner_instructions").notNull().default(""),
+  reminder: text("reminder").notNull().default(""),
+  goal: text("goal").notNull().default(""),
+  deliverable: text("deliverable").notNull().default(""),
+  acceptance: text("acceptance").notNull().default(""),
+  dueDate: text("due_date").notNull(),
+  publishedBy: text("published_by").notNull(),
+  publishedAt: text("published_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
 
 export const progress = sqliteTable("progress", {
   id: integer("id").primaryKey({ autoIncrement: true }),

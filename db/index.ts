@@ -25,7 +25,8 @@ export function ensureSchema() {
     `CREATE TABLE IF NOT EXISTS learners (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, group_id INTEGER NOT NULL REFERENCES groups(id), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_learners_group_name ON learners(group_id, name)`,
     `CREATE INDEX IF NOT EXISTS idx_learners_group_id ON learners(group_id)`,
-    `CREATE TABLE IF NOT EXISTS day_plans (id INTEGER PRIMARY KEY AUTOINCREMENT, cohort_id INTEGER NOT NULL REFERENCES cohorts(id), phase TEXT NOT NULL CHECK(phase IN ('pre_online','offline_camp','post_online')), day_number INTEGER NOT NULL, label TEXT NOT NULL, title TEXT NOT NULL, goal TEXT NOT NULL DEFAULT '', deliverable TEXT NOT NULL DEFAULT '', acceptance TEXT NOT NULL DEFAULT '', due_date TEXT NOT NULL, sort_order INTEGER NOT NULL, configured INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS day_plans (id INTEGER PRIMARY KEY AUTOINCREMENT, cohort_id INTEGER NOT NULL REFERENCES cohorts(id), phase TEXT NOT NULL CHECK(phase IN ('pre_online','offline_camp','post_online')), day_number INTEGER NOT NULL, label TEXT NOT NULL, title TEXT NOT NULL, coach_action TEXT NOT NULL DEFAULT '', group_announcement TEXT NOT NULL DEFAULT '', materials TEXT NOT NULL DEFAULT '', learner_instructions TEXT NOT NULL DEFAULT '', reminder TEXT NOT NULL DEFAULT '', goal TEXT NOT NULL DEFAULT '', deliverable TEXT NOT NULL DEFAULT '', acceptance TEXT NOT NULL DEFAULT '', due_date TEXT NOT NULL, sort_order INTEGER NOT NULL, configured INTEGER NOT NULL DEFAULT 0, has_unpublished_changes INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS day_plan_publications (day_plan_id INTEGER PRIMARY KEY REFERENCES day_plans(id), title TEXT NOT NULL, coach_action TEXT NOT NULL DEFAULT '', group_announcement TEXT NOT NULL DEFAULT '', materials TEXT NOT NULL DEFAULT '', learner_instructions TEXT NOT NULL DEFAULT '', reminder TEXT NOT NULL DEFAULT '', goal TEXT NOT NULL DEFAULT '', deliverable TEXT NOT NULL DEFAULT '', acceptance TEXT NOT NULL DEFAULT '', due_date TEXT NOT NULL, published_by TEXT NOT NULL, published_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE TABLE IF NOT EXISTS progress (id INTEGER PRIMARY KEY AUTOINCREMENT, learner_id INTEGER NOT NULL REFERENCES learners(id), day_plan_id INTEGER NOT NULL REFERENCES day_plans(id), status TEXT NOT NULL DEFAULT 'not_started' CHECK(status IN ('not_started','in_progress','needs_revision','passed')), evidence_url TEXT NOT NULL DEFAULT '', evidence_note TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_progress_learner_day ON progress(learner_id, day_plan_id)`,
     `CREATE INDEX IF NOT EXISTS idx_progress_day_status ON progress(day_plan_id, status)`,
@@ -41,6 +42,17 @@ export function ensureSchema() {
     const cohortColumns = (await db.prepare("PRAGMA table_info(cohorts)").all<{ name: string }>()).results;
     if (!groupColumns.some((column) => column.name === "cohort_id")) await db.prepare("ALTER TABLE groups ADD COLUMN cohort_id INTEGER REFERENCES cohorts(id)").run();
     if (!dayColumns.some((column) => column.name === "cohort_id")) await db.prepare("ALTER TABLE day_plans ADD COLUMN cohort_id INTEGER REFERENCES cohorts(id)").run();
+    const deliveryColumns = [
+      ["coach_action", "ALTER TABLE day_plans ADD COLUMN coach_action TEXT NOT NULL DEFAULT ''"],
+      ["group_announcement", "ALTER TABLE day_plans ADD COLUMN group_announcement TEXT NOT NULL DEFAULT ''"],
+      ["materials", "ALTER TABLE day_plans ADD COLUMN materials TEXT NOT NULL DEFAULT ''"],
+      ["learner_instructions", "ALTER TABLE day_plans ADD COLUMN learner_instructions TEXT NOT NULL DEFAULT ''"],
+      ["reminder", "ALTER TABLE day_plans ADD COLUMN reminder TEXT NOT NULL DEFAULT ''"],
+      ["has_unpublished_changes", "ALTER TABLE day_plans ADD COLUMN has_unpublished_changes INTEGER NOT NULL DEFAULT 0"],
+    ] as const;
+    for (const [name, statement] of deliveryColumns) {
+      if (!dayColumns.some((column) => column.name === name)) await db.prepare(statement).run();
+    }
     if (!cohortColumns.some((column) => column.name === "status")) await db.prepare("ALTER TABLE cohorts ADD COLUMN status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived'))").run();
     if (!cohortColumns.some((column) => column.name === "archived_at")) await db.prepare("ALTER TABLE cohorts ADD COLUMN archived_at TEXT").run();
     if (!cohortColumns.some((column) => column.name === "archived_by")) await db.prepare("ALTER TABLE cohorts ADD COLUMN archived_by TEXT").run();
@@ -56,6 +68,7 @@ export function ensureSchema() {
       db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_day_plans_cohort_phase_day ON day_plans(cohort_id,phase,day_number)"),
       db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_day_plans_cohort_sort_order ON day_plans(cohort_id,sort_order)"),
       db.prepare("CREATE INDEX IF NOT EXISTS idx_day_plans_cohort_id ON day_plans(cohort_id)"),
+      db.prepare("INSERT OR IGNORE INTO day_plan_publications (day_plan_id,title,coach_action,group_announcement,materials,learner_instructions,reminder,goal,deliverable,acceptance,due_date,published_by,published_at) SELECT id,title,coach_action,group_announcement,materials,learner_instructions,reminder,goal,deliverable,acceptance,due_date,'migration',updated_at FROM day_plans WHERE configured=1"),
     ]);
   })();
   return schemaReady;

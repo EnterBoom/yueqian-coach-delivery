@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { assertCohortWritable, canAccessGroup, normalizeHttpsUrl, validateProgressEvidence } from "../lib/policy.mjs";
+import { assertCohortWritable, canAccessGroup, normalizeHttpsUrl, validateHttpsLinksInText, validateProgressEvidence } from "../lib/policy.mjs";
 import { parseLearnerRows } from "../lib/import-learners.mjs";
 import { defaultDayId } from "../lib/day-view.mjs";
 
@@ -16,6 +16,11 @@ test("passed progress requires safe evidence", () => {
   assert.throws(() => normalizeHttpsUrl("javascript:alert(1)"), /HTTPS/);
   assert.equal(validateProgressEvidence("passed", "https://example.com/work", "").evidenceUrl, "https://example.com/work");
   assert.equal(validateProgressEvidence("passed", "", "教练现场验收通过").evidenceNote, "教练现场验收通过");
+});
+
+test("coach materials accept text and HTTPS links only", () => {
+  assert.equal(validateHttpsLinksInText("信息卡 https://example.com/card"), "信息卡 https://example.com/card");
+  assert.throws(() => validateHttpsLinksInText("旧链接 http://example.com/card"), /HTTPS/);
 });
 
 test("finished site has no starter or performance surface", async () => {
@@ -99,8 +104,40 @@ test("route day selection defaults to the calendar and drives the overview", asy
   assert.equal(defaultDayId(days, "2026-08-11"), 1);
   assert.equal(defaultDayId(days, "2026-08-20"), 2);
   const client = await readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8");
-  assert.match(client, /aria-pressed=\{day\.id === current\.id\}/);
-  assert.match(client, /点击日期，预览对应作战面/);
+  assert.match(client, /aria-pressed=\{day\.id === currentId\}/);
+  assert.match(client, /点击日期，打开对应执行卡/);
   assert.match(client, /当日通过率/);
   assert.match(client, /setSelectedDayId\(null\)/);
+});
+
+test("coach dispatch uses drafts, immutable publications and independent cohort sources", async () => {
+  const [route, schema, client] = await Promise.all([
+    readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /dayPlanPublications/);
+  assert.match(schema, /hasUnpublishedChanges/);
+  assert.match(route, /save_day_draft/);
+  assert.match(route, /publish_day/);
+  assert.match(route, /source as PlanSource/);
+  assert.match(route, /该任务尚未发布/);
+  assert.match(client, /复制群公告/);
+  assert.match(client, /标准25天模板/);
+  assert.match(client, /复制已有营期/);
+  assert.match(client, /25天空白计划/);
+});
+
+test("group lifecycle and archived learner records are explicit", async () => {
+  const [route, client] = await Promise.all([
+    readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(route, /update_coach_group/);
+  assert.match(route, /remove_empty_group/);
+  assert.match(route, /merge_group/);
+  assert.match(route, /两个小组存在同名学员/);
+  assert.match(client, /当前营期分组/);
+  assert.match(client, /查看历史档案/);
+  assert.match(client, /学员全周期档案/);
 });
