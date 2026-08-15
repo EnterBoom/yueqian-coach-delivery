@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { defaultDayId } from "@/lib/day-view.mjs";
 import type { DayPlan, DeliveryException, Group, Learner, PlanSource, ProgressStatus, WorkspaceSnapshot } from "@/lib/types";
+import packageJson from "@/package.json";
 
 type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings";
 type Mutate = (payload: Record<string, unknown>, message: string) => Promise<boolean>;
@@ -73,7 +74,7 @@ export function OperationsApp() {
 
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><span className="brand-seal">跃</span><div><strong>跃迁计划</strong><small>教练交付作战台</small></div></div>
+      <div className="brand"><span className="brand-seal">跃</span><div><strong>跃迁计划</strong><small>教练交付作战台 <span className="version-tag">v{packageJson.version}</span></small></div></div>
       <nav aria-label="主导航">{nav.map(([key, number, label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}><span>{number}</span>{label}</button>)}</nav>
       <div className="sidebar-foot"><div className="avatar">{snapshot.user.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{snapshot.user.displayName}</strong><small>{snapshot.user.role === "owner" ? "项目负责人" : "带组教练"}</small></div></div>
     </aside>

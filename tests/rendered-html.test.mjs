@@ -37,6 +37,7 @@ test("finished site has no starter or performance surface", async () => {
   assert.match(client, /线上前10天/);
   assert.match(client, /线下5天/);
   assert.match(client, /线上后10天/);
+  assert.match(client, /packageJson\.version/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout + client, /绩效|奖金|结算|排名/);
   assert.match(wrangler, /"binding": "DB"/);
