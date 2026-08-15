@@ -2,10 +2,12 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { defaultDayId } from "@/lib/day-view.mjs";
+import { isThemePreference, resolveTheme, THEME_STORAGE_KEY } from "@/lib/theme.mjs";
 import type { DayPlan, DeliveryException, Group, Learner, PlanSource, ProgressStatus, WorkspaceSnapshot } from "@/lib/types";
 import packageJson from "@/package.json";
 
 type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings";
+type ThemePreference = "system" | "light" | "dark";
 type Mutate = (payload: Record<string, unknown>, message: string) => Promise<boolean>;
 
 const phaseMeta = {
@@ -40,6 +42,8 @@ export function OperationsApp() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [selectedDayId, setSelectedDayId] = useState<number | null>(null);
+  const [themePreference, setThemePreference] = useState<ThemePreference>("system");
+  const [themeReady, setThemeReady] = useState(false);
 
   const refresh = async () => {
     try { setSnapshot(await api(undefined, snapshot?.cohort?.id)); setError(""); } catch (problem) { setError((problem as Error).message); }
@@ -49,6 +53,31 @@ export function OperationsApp() {
     api().then((data) => { if (active) setSnapshot(data); }).catch((problem) => { if (active) setError((problem as Error).message); });
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      setThemePreference(isThemePreference(stored) ? stored : "system");
+      setThemeReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!themeReady) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      const resolved = resolveTheme(themePreference, media.matches);
+      document.documentElement.dataset.theme = resolved;
+      document.documentElement.style.colorScheme = resolved;
+    };
+    applyTheme();
+    if (themePreference === "system") media.addEventListener("change", applyTheme);
+    return () => media.removeEventListener("change", applyTheme);
+  }, [themePreference, themeReady]);
+
+  const changeTheme = (preference: ThemePreference) => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+    setThemePreference(preference);
+  };
 
   async function mutate(payload: Record<string, unknown>, message: string) {
     setBusy(true); setError(""); setNotice("");
@@ -79,7 +108,7 @@ export function OperationsApp() {
       <div className="sidebar-foot"><div className="avatar">{snapshot.user.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{snapshot.user.displayName}</strong><small>{snapshot.user.role === "owner" ? "项目负责人" : "带组教练"}</small></div></div>
     </aside>
     <main>
-      <header className="topbar"><button className="mobile-brand" onClick={() => setTab("overview")}>跃迁计划</button><div><span className={`live-dot ${readOnly ? "archived" : ""}`}/>{readOnly ? "历史营期" : "营期协同中"}</div><div className="topbar-right"><label className="cohort-switch"><span>当前营期</span><select value={snapshot.cohort.id} onChange={(event) => switchCohort(Number(event.target.value))} disabled={busy}>{snapshot.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label><button onClick={refresh} aria-label="刷新数据">刷新</button></div></header>
+      <header className="topbar"><button className="mobile-brand" onClick={() => setTab("overview")}>跃迁计划</button><div><span className={`live-dot ${readOnly ? "archived" : ""}`}/>{readOnly ? "历史营期" : "营期协同中"}</div><div className="topbar-right"><label className="theme-switch"><span>界面</span><select aria-label="界面主题" value={themePreference} onChange={(event) => changeTheme(event.target.value as ThemePreference)}><option value="system">系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label><label className="cohort-switch"><span>当前营期</span><select value={snapshot.cohort.id} onChange={(event) => switchCohort(Number(event.target.value))} disabled={busy}>{snapshot.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label><button onClick={refresh} aria-label="刷新数据">刷新</button></div></header>
       {(notice || error) && <div className={`toast ${error ? "error" : "success"}`}>{error || notice}<button onClick={() => { setError(""); setNotice(""); }}>×</button></div>}
       <div className="page-wrap">
         {readOnly && <div className="read-only-banner"><strong>已归档 · 只读</strong><span>这里展示当期实际发布的任务、学员作业、证据与异常记录。</span></div>}
@@ -184,9 +213,19 @@ function ExceptionCard({ item, owner, busy, mutate, readOnly }: { item: Delivery
 
 function CohortManager({ snapshot, busy, mutate, switchCohort }: { snapshot: WorkspaceSnapshot; busy: boolean; mutate: Mutate; switchCohort: (id: number, tab?: Tab) => Promise<void> }) {
   const [source, setSource] = useState<PlanSource>("standard");
-  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); if (await mutate({ action: "initialize", planSource: source, sourceCohortId: data.get("sourceCohortId"), name: data.get("name"), preStartDate: data.get("preStartDate"), offlineStartDate: data.get("offlineStartDate"), postStartDate: data.get("postStartDate") }, "新营期已创建并切换")) form.reset(); };
+  const [showCreate, setShowCreate] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = event.currentTarget; const data = new FormData(form); if (await mutate({ action: "initialize", planSource: source, sourceCohortId: data.get("sourceCohortId"), name: data.get("name"), preStartDate: data.get("preStartDate"), offlineStartDate: data.get("offlineStartDate"), postStartDate: data.get("postStartDate") }, "新营期已创建并切换")) { form.reset(); setSource("standard"); setShowCreate(false); } };
   const changeStatus = async (cohort: WorkspaceSnapshot["cohorts"][number]) => { const archive = cohort.status === "active"; if (archive && !window.confirm(`确认归档“${cohort.name}”？归档后保留全部数据，但只能查看。`)) return; await mutate({ action: archive ? "archive_cohort" : "reopen_cohort", cohortId: cohort.id }, archive ? "营期已归档" : "营期已重新开启"); };
-  return <section className="content-page"><PageTitle kicker="COHORT CONTROL" title="营期管理" detail="每一期拥有独立任务、教练、学员与历史档案；创建新营期不会改动其他营期。"/><div className="cohort-layout"><form className="settings-card cohort-create" onSubmit={submit}><span className="card-number">NEW COHORT</span><h2>创建新营期</h2><label>营期名称<input name="name" required/></label><label>25天计划来源<select name="planSource" value={source} onChange={(event) => setSource(event.target.value as PlanSource)}><option value="standard">标准25天模板</option><option value="cohort">复制已有营期</option><option value="blank">25天空白计划</option></select></label>{source === "cohort" && <label>复制哪一期<select name="sourceCohortId" required defaultValue=""><option value="" disabled>请选择</option>{snapshot.cohorts.map((cohort) => <option value={cohort.id} key={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label>}<div className="date-grid"><label>线上前10天开始<input name="preStartDate" type="date" required/></label><label>线下5天开始<input name="offlineStartDate" type="date" required/></label><label>线上后10天开始<input name="postStartDate" type="date" required/></label></div><button className="primary" disabled={busy}>{busy ? "正在创建…" : "创建并进入新营期"}</button></form><div className="cohort-list"><div className="section-head"><div><span className="kicker">COHORT ARCHIVE</span><h2>全部营期</h2></div><b>{snapshot.cohorts.length} 期</b></div>{snapshot.cohorts.map((cohort) => <article key={cohort.id} className={`${cohort.id === snapshot.cohort?.id ? "current" : ""} ${cohort.status}`}><button type="button" className="cohort-open" onClick={() => switchCohort(cohort.id, cohort.status === "archived" ? "learners" : "overview")}><strong>{cohort.name}</strong><small>{cohort.pre_start_date} → {cohort.post_start_date}</small>{cohort.archived_at && <small>归档于 {cohort.archived_at.slice(0, 16).replace("T", " ")} · {cohort.archived_by}</small>}<b>{cohort.status === "archived" ? "查看历史档案 →" : "进入营期 →"}</b></button><div className="cohort-actions"><span>{cohort.status === "archived" ? "已归档" : cohort.id === snapshot.cohort?.id ? "当前营期" : "进行中"}</span><button type="button" disabled={busy} onClick={() => changeStatus(cohort)}>{cohort.status === "archived" ? "重新开启" : "归档营期"}</button></div></article>)}</div></div></section>;
+  return <section className="content-page cohort-page">
+    <PageTitle kicker="COHORT CONTROL" title="营期管理" detail="每一期拥有独立任务、教练、学员与历史档案；创建新营期不会改动其他营期。" action={<button className={showCreate ? "ghost" : "primary"} onClick={() => setShowCreate(!showCreate)}>{showCreate ? "取消新建" : "+ 新建营期"}</button>}/>
+    {showCreate && <form className="settings-card cohort-create-panel" onSubmit={submit}>
+      <div className="cohort-create-heading"><span className="card-number">NEW COHORT</span><h2>创建新营期</h2><p>选好计划来源与三个阶段日期，系统会生成一份独立的25天计划。</p></div>
+      <div className="cohort-create-fields"><label>营期名称<input name="name" required/></label><label>25天计划来源<select name="planSource" value={source} onChange={(event) => setSource(event.target.value as PlanSource)}><option value="standard">标准25天模板</option><option value="cohort">复制已有营期</option><option value="blank">25天空白计划</option></select></label>{source === "cohort" && <label>复制哪一期<select name="sourceCohortId" required defaultValue=""><option value="" disabled>请选择</option>{snapshot.cohorts.map((cohort) => <option value={cohort.id} key={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label>}</div>
+      <div className="date-grid"><label>线上前10天开始<input name="preStartDate" type="date" required/></label><label>线下5天开始<input name="offlineStartDate" type="date" required/></label><label>线上后10天开始<input name="postStartDate" type="date" required/></label></div>
+      <div className="cohort-create-actions"><button type="button" className="text-button" onClick={() => setShowCreate(false)}>取消</button><button className="primary" disabled={busy}>{busy ? "正在创建…" : "创建并进入新营期"}</button></div>
+    </form>}
+    <div className="cohort-list"><div className="section-head"><div><span className="kicker">COHORT ARCHIVE</span><h2>全部营期</h2></div><b>{snapshot.cohorts.length} 期</b></div>{snapshot.cohorts.map((cohort) => <article key={cohort.id} className={`${cohort.id === snapshot.cohort?.id ? "current" : ""} ${cohort.status}`}><button type="button" className="cohort-open" onClick={() => switchCohort(cohort.id, cohort.status === "archived" ? "learners" : "overview")}><strong>{cohort.name}</strong><small>{cohort.pre_start_date} → {cohort.post_start_date}</small>{cohort.archived_at && <small>归档于 {cohort.archived_at.slice(0, 16).replace("T", " ")} · {cohort.archived_by}</small>}<b>{cohort.status === "archived" ? "查看历史档案 →" : "进入营期 →"}</b></button><div className="cohort-actions"><span>{cohort.status === "archived" ? "已归档" : cohort.id === snapshot.cohort?.id ? "当前营期" : "进行中"}</span><button type="button" disabled={busy} onClick={() => changeStatus(cohort)}>{cohort.status === "archived" ? "重新开启" : "归档营期"}</button></div></article>)}</div>
+  </section>;
 }
 
 function Settings({ snapshot, busy, mutate, readOnly }: { snapshot: WorkspaceSnapshot; busy: boolean; mutate: Mutate; readOnly: boolean }) {

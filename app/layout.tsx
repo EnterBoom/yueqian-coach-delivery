@@ -12,6 +12,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const themeInitializer = `(function(){try{var p=localStorage.getItem("yueqian-theme");var d=p==="dark"||(p!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);var t=d?"dark":"light";document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}catch(e){document.documentElement.dataset.theme="light"}})()`;
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://sites.openai.com"),
   title: "跃迁计划 · 教练交付作战台",
@@ -33,7 +35,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitializer }}/></head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
