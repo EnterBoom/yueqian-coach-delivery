@@ -24,29 +24,31 @@ test("coach materials accept text and HTTPS links only", () => {
 });
 
 test("finished site has no starter or performance surface", async () => {
-  const [page, layout, client, packageJson, hosting] = await Promise.all([
+  const [page, layout, client, packageJson, wrangler] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
   ]);
   assert.match(page, /OperationsApp/);
-  assert.match(page, /requireChatGPTUser\("\/"\)/);
+  assert.match(page, /requireAccessUser\(\)/);
   assert.match(layout, /教练交付作战台/);
   assert.match(client, /线上前10天/);
   assert.match(client, /线下5天/);
   assert.match(client, /线上后10天/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.doesNotMatch(page + layout + client, /绩效|奖金|结算|排名/);
-  assert.match(hosting, /"d1": "DB"/);
-  assert.match(hosting, /"r2": null/);
+  assert.match(wrangler, /"binding": "DB"/);
+  assert.match(wrangler, /"name": "yueqian-coach-ops-prod"/);
+  assert.match(wrangler, /"preview_urls": false/);
 });
 
 test("production owner bootstrap is explicit", async () => {
   const route = await readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8");
   assert.match(route, /INITIAL_OWNER_EMAIL/);
   assert.match(route, /NODE_ENV === "development"/);
+  assert.match(route, /if \(!member\).*尚未分配项目角色/s);
   assert.doesNotMatch(route, /SELECT COUNT\(\*\) AS count FROM members/);
 });
 
@@ -61,11 +63,11 @@ test("learner import accepts a selected group and Chinese commas", () => {
   ]);
 });
 
-test("signed-in email remains usable when Sites omits user id", async () => {
-  const auth = await readFile(new URL("../app/chatgpt-auth.ts", import.meta.url), "utf8");
-  assert.match(auth, /if \(!email\) return null/);
-  assert.match(auth, /userId \?\? `email:\$\{email\.toLowerCase\(\)\}`/);
-  assert.doesNotMatch(auth, /if \(!userId \|\| !email\) return null/);
+test("production identity comes only from a verified Cloudflare Access JWT", async () => {
+  const auth = await readFile(new URL("../lib/access-auth.mjs", import.meta.url), "utf8");
+  assert.match(auth, /cf-access-jwt-assertion/);
+  assert.match(auth, /jwtVerify/);
+  assert.doesNotMatch(auth, /oai-authenticated-user/);
 });
 
 test("each cohort has isolated delivery data and an internal manager", async () => {

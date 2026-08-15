@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yueqian-coach-ops-prod",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "keep_vars": true,
+  "vars": {
+    "CF_ACCESS_AUD": "ce384f70478c755fc66b677d03e2a3c5591b13a8224110ba48e871c9a238c3bd",
+    "CF_ACCESS_TEAM_DOMAIN": "vanya-ops.cloudflareaccess.com",
+    "INITIAL_OWNER_EMAIL": "729685219@qq.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "yueqian-coach-ops-prod",
+      "database_id": "847fbec5-b291-4018-8b30-337163e6f4f9",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
