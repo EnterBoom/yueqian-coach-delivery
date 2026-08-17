@@ -111,6 +111,7 @@ test("route day selection defaults to the calendar and drives the overview", asy
   assert.match(client, /点击日期，打开对应执行卡/);
   assert.match(client, /当日通过率/);
   assert.match(client, /setSelectedDayId\(null\)/);
+  assert.doesNotMatch(client, /scrollIntoView/);
 });
 
 test("coach dispatch uses drafts, immutable publications and independent cohort sources", async () => {
