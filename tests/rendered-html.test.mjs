@@ -127,6 +127,7 @@ test("coach dispatch uses drafts, immutable publications and independent cohort 
   assert.match(route, /source as PlanSource/);
   assert.match(route, /该任务尚未发布/);
   assert.match(client, /复制群公告/);
+  assert.match(client, /showHeading=\{false\}/);
   assert.match(client, /标准25天模板/);
   assert.match(client, /复制已有营期/);
   assert.match(client, /25天空白计划/);

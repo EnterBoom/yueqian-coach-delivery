@@ -572,6 +572,13 @@ label { color: var(--muted); gap: 6px; }
 .bar i { background: var(--coral); }
 
 .route-section { padding-top: 20px; }
+.route-section.headerless { padding-top: 0; }
+.route-inline-title { min-width: 250px; padding-left: 24px; border-left: 1px solid var(--line); display: grid; gap: 5px; align-self: stretch; align-content: center; }
+.route-inline-title strong { font-size: 13px; font-weight: 650; color: var(--ink); }
+.plan-page .page-title { padding-bottom: 10px; }
+.plan-page .route-phase { padding: 10px 12px; }
+.plan-page .route-phase > div { margin-top: 8px; }
+.plan-page .route-phase > div button { height: 24px; }
 .route-strip { grid-template-columns: 2fr 1fr 2fr; gap: 0; border: 1px solid var(--line); background: var(--surface); }
 .route-phase { padding: 13px 14px; border: 0; border-top: 2px solid; border-right: 1px solid var(--line); background: transparent; }
 .route-phase:last-child { border-right: 0; }
@@ -715,6 +722,8 @@ html[data-theme="dark"] .mobile-brand { color: var(--ink)!important; }
   .page-title h1 { font-size: 27px; }
   .page-title .primary, .page-title .ghost { min-height: 40px; }
   .page-title > button { min-width: 76px; }
+  .route-inline-title { min-width: 0; padding-left: 0; border-left: 0; justify-items: end; text-align: right; }
+  .route-inline-title strong { font-size: 10px; }
   .hero-panel > div:first-child { padding: 25px 20px; }
   .today-card { padding: 21px; }
   .metrics article { min-height: 92px; padding: 14px; }
