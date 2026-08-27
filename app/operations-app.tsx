@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { InterviewTool } from "@/app/interview-tool";
 import { defaultDayId } from "@/lib/day-view.mjs";
 import { isThemePreference, resolveTheme, THEME_STORAGE_KEY } from "@/lib/theme.mjs";
 import type { DayPlan, DeliveryException, Group, Learner, PlanSource, ProgressStatus, WorkspaceSnapshot } from "@/lib/types";
 import packageJson from "@/package.json";
 
-type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings";
+type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings" | "tools";
 type ThemePreference = "system" | "light" | "dark";
 type Mutate = (payload: Record<string, unknown>, message: string) => Promise<boolean>;
 
@@ -105,6 +106,7 @@ export function OperationsApp() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-seal">跃</span><div><strong>跃迁计划</strong><small>教练交付作战台 <span className="version-tag">v{packageJson.version}</span></small></div></div>
       <nav aria-label="主导航">{nav.map(([key, number, label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}><span>{number}</span>{label}</button>)}</nav>
+      <button className={`toolbox-entry ${tab === "tools" ? "active" : ""}`} onClick={() => setTab("tools")}><span aria-hidden="true">⌘</span><div><strong>工具箱</strong><small>AI 人设深访</small></div></button>
       <section className="sidebar-controls" aria-label="工作台设置"><div className="sidebar-live"><span className={`live-dot ${readOnly ? "archived" : ""}`}/>{readOnly ? "历史营期" : "营期协同中"}</div><label>当前营期<select aria-label="侧栏当前营期" value={snapshot.cohort.id} onChange={(event) => switchCohort(Number(event.target.value))} disabled={busy}>{snapshot.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label><label>界面主题<select aria-label="侧栏界面主题" value={themePreference} onChange={(event) => changeTheme(event.target.value as ThemePreference)}><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label><button onClick={refresh} aria-label="刷新工作台数据">刷新数据</button></section>
       <div className="sidebar-foot"><div className="avatar">{snapshot.user.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{snapshot.user.displayName}</strong><small>{snapshot.user.role === "owner" ? "项目负责人" : "带组教练"}</small></div></div>
     </aside>
@@ -119,9 +121,10 @@ export function OperationsApp() {
         {tab === "plan" && <Plan snapshot={snapshot} busy={busy} mutate={mutate} readOnly={readOnly} selectedDayId={selectedDayId}/>} 
         {tab === "cohorts" && snapshot.user.role === "owner" && <CohortManager snapshot={snapshot} busy={busy} mutate={mutate} switchCohort={switchCohort}/>} 
         {tab === "settings" && snapshot.user.role === "owner" && <Settings snapshot={snapshot} busy={busy} mutate={mutate} readOnly={readOnly}/>} 
+        {tab === "tools" && <Toolbox/>}
       </div>
     </main>
-    <nav className="mobile-nav" aria-label="移动端导航">{nav.slice(0, 4).map(([key,,label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{label.replace("交付", "")}</button>)}</nav>
+    <nav className="mobile-nav" aria-label="移动端导航">{nav.slice(0, 4).map(([key,,label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{label.replace("交付", "")}</button>)}<button className={tab === "tools" ? "active" : ""} onClick={() => setTab("tools")}>工具</button></nav>
   </div>;
 }
 
@@ -243,4 +246,5 @@ function GroupAdminRow({ group, groups, busy, readOnly, mutate }: { group: Group
 }
 
 function PageTitle({ kicker, title, detail, action }: { kicker: string; title: string; detail: string; action?: React.ReactNode }) { return <div className="page-title"><div><span className="kicker">{kicker}</span><h1>{title}</h1><p>{detail}</p></div>{action}</div>; }
+function Toolbox() { return <section className="content-page toolbox-page"><PageTitle kicker="YUEQIAN TOOLS" title="工具箱" detail="把访谈、素材整理等独立能力放进同一个工作台。"/><InterviewTool/></section>; }
 function Empty({ title, detail }: { title: string; detail: string }) { return <div className="empty"><span>○</span><strong>{title}</strong><p>{detail}</p></div>; }

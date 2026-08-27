@@ -146,3 +146,22 @@ test("group lifecycle and archived learner records are explicit", async () => {
   assert.match(client, /查看历史档案/);
   assert.match(client, /学员全周期档案/);
 });
+
+test("the interview experiment is an authenticated internal toolbox", async () => {
+  const [client, tool, route, prompt, wrangler] = await Promise.all([
+    readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/interview-tool.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/interview/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/interview.mjs", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
+  ]);
+  assert.match(client, /工具箱/);
+  assert.match(client, /InterviewTool/);
+  assert.match(tool, /AI 人设深访/);
+  assert.match(tool, /yueqian-interview-session-v1/);
+  assert.match(route, /SELECT email FROM members WHERE email=\?/);
+  assert.match(route, /DEEPSEEK_API_KEY/);
+  assert.doesNotMatch(client + tool, /DEEPSEEK_API_KEY/);
+  assert.match(prompt, /九宫格话题骨架/);
+  assert.match(wrangler, /INTERVIEW_LLM_MODEL/);
+});

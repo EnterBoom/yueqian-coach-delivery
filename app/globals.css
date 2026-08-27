@@ -700,6 +700,87 @@ html[data-theme="dark"] .exception-status.handling { color: #efbd72; background:
 html[data-theme="dark"] .exception-status.resolved { color: #72d5aa; background: rgba(75,179,139,.13); }
 html[data-theme="dark"] .mobile-brand { color: var(--ink)!important; }
 
+/* v1.2 — internal tools */
+.toolbox-entry { margin: 14px 6px 0; padding: 11px 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 8px; background: rgba(255,255,255,.025); color: #b7c4d2; display: flex; align-items: center; gap: 10px; text-align: left; }
+.toolbox-entry > span { width: 27px; height: 27px; border: 1px solid rgba(255,255,255,.12); border-radius: 7px; display: grid; place-items: center; color: #8eacff; font-family: var(--font-geist-mono); }
+.toolbox-entry div { display: grid; gap: 2px; }
+.toolbox-entry strong { font-size: 11px; }
+.toolbox-entry small { color: #66788b; font-size: 9px; }
+.toolbox-entry:hover, .toolbox-entry.active { border-color: rgba(90,131,255,.45); background: rgba(90,131,255,.1); color: white; }
+.toolbox-entry.active { box-shadow: inset 2px 0 var(--primary-blue); }
+
+.toolbox-page { max-width: 1320px; }
+.toolbox-page > .page-title { padding-bottom: 10px; }
+.toolbox-page > .page-title p { max-width: none; }
+.interview-shell { min-height: 620px; height: calc(100dvh - 112px); max-height: 860px; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+.tool-status { font-family: var(--font-geist-mono); color: var(--coral); font-size: 9px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+
+.interview-intro { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(380px, .92fr); }
+.interview-intro-copy { padding: clamp(42px, 6vw, 76px); color: #eef5ff; background-color: var(--surface-command); background-image: radial-gradient(circle at 18% 12%, rgba(53,109,255,.28), transparent 37%), radial-gradient(circle at 92% 90%, rgba(242,118,92,.15), transparent 32%); display: flex; flex-direction: column; justify-content: center; }
+.interview-intro-copy h2 { margin: 18px 0 20px; font-size: clamp(48px, 6vw, 78px); line-height: .94; letter-spacing: -.065em; text-wrap: balance; }
+.interview-intro-copy > p { margin: 0; max-width: 570px; color: #9fb0c4; font-size: 13px; line-height: 1.9; }
+.interview-intro-copy dl { margin: auto 0 0; padding-top: 42px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
+.interview-intro-copy dl div { padding: 14px 16px; border-left: 1px solid rgba(255,255,255,.12); }
+.interview-intro-copy dl div:first-child { padding-left: 0; border-left: 0; }
+.interview-intro-copy dt { color: #698097; font-size: 9px; }
+.interview-intro-copy dd { margin: 7px 0 0; color: #dce7f3; font-size: 11px; line-height: 1.5; }
+.interview-start-panel { padding: clamp(32px, 4vw, 56px); display: grid; align-content: center; gap: 22px; background: var(--surface); }
+.interview-mark { width: 58px; height: 58px; border: 1px solid var(--line-strong); border-radius: 16px; display: grid; place-items: center; color: var(--coral); font-size: 23px; font-weight: 760; box-shadow: inset 0 0 24px var(--primary-blue-soft); }
+.interview-start-panel h3 { margin: 6px 0 7px; font-size: 22px; letter-spacing: -.035em; }
+.interview-start-panel p, .interview-start-panel > small { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.interview-start-panel textarea { min-height: 130px; }
+.interview-start-panel .primary { width: 100%; min-height: 45px; }
+
+.interview-chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.interview-chat > header { min-height: 58px; padding: 10px 16px 10px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 20px; background: var(--surface); }
+.interview-chat > header > div { display: flex; align-items: center; gap: 12px; }
+.interview-chat > header > div:first-child { display: grid; gap: 3px; }
+.interview-chat > header strong { font-size: 12px; }
+.interview-chat > header time { color: var(--muted-soft); font-family: var(--font-geist-mono); font-size: 10px; font-variant-numeric: tabular-nums; }
+.interview-chat > header button { min-height: 34px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; }
+.interview-chat > header button:hover, .interview-chat > header button.active { color: var(--primary-blue); border-color: var(--primary-blue); background: var(--primary-blue-soft); }
+.interview-workspace { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; background: var(--surface-subtle); }
+.interview-conversation { min-height: 0; overflow-y: auto; padding: 30px clamp(22px, 5vw, 70px); scroll-behavior: smooth; }
+.interview-conversation article { max-width: 760px; margin: 0 auto 17px; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.interview-conversation article > span { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-raised); color: var(--muted); font-size: 9px; font-weight: 800; }
+.interview-conversation article p { width: fit-content; max-width: min(650px, 88%); margin: 0; padding: 11px 14px; border: 1px solid var(--line); border-radius: 3px 13px 13px 13px; background: var(--surface); color: var(--ink); font-size: 12px; line-height: 1.75; white-space: pre-wrap; box-shadow: 0 6px 18px color-mix(in srgb, var(--navy) 6%, transparent); }
+.interview-conversation article.user { grid-template-columns: minmax(0, 1fr) 30px; }
+.interview-conversation article.user > span { grid-column: 2; grid-row: 1; background: var(--primary-blue); color: white; }
+.interview-conversation article.user p { grid-column: 1; grid-row: 1; justify-self: end; border-color: transparent; border-radius: 13px 3px 13px 13px; background: var(--primary-blue); color: white; }
+.interview-conversation article.thinking p { color: var(--muted); }
+.thinking-dots { display: inline-block; margin-left: 4px; letter-spacing: 2px; animation: interviewPulse 1.2s ease-in-out infinite; }
+@keyframes interviewPulse { 50% { opacity: .35; } }
+.interview-nodes { width: min(330px, 34vw); overflow-y: auto; padding: 20px; border-left: 1px solid var(--line); background: var(--surface); }
+.interview-nodes > header { display: grid; gap: 6px; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+.interview-nodes > header strong { font-size: 12px; }
+.interview-nodes > article { padding: 14px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 27px 1fr; gap: 9px; }
+.interview-nodes > article > b { color: var(--primary-blue); font-family: var(--font-geist-mono); font-size: 9px; }
+.interview-nodes > article div { display: grid; gap: 5px; }
+.interview-nodes > article strong { font-size: 11px; }
+.interview-nodes > article small, .interview-nodes > article p, .nodes-empty { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.nodes-empty { padding-top: 20px; }
+.interview-input { padding: 12px 14px; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) 66px; gap: 9px; background: var(--surface); }
+.interview-input label { min-width: 0; }
+.interview-input textarea { min-height: 42px; max-height: 120px; resize: none; padding: 11px 13px; }
+.interview-input > button { border: 0; border-radius: 7px; background: var(--primary-blue); color: white; font-size: 11px; font-weight: 700; }
+.interview-input > button:hover { background: var(--primary-blue-hover); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+.interview-summary { overflow-y: auto; }
+.interview-summary > header { padding: 30px 34px; border-bottom: 1px solid #233953; color: #eff5ff; background-color: var(--surface-command); background-image: radial-gradient(circle at 84% -30%, rgba(53,109,255,.34), transparent 42%); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.interview-summary > header h2 { margin: 9px 0 5px; font-size: 31px; letter-spacing: -.045em; }
+.interview-summary > header p { margin: 0; color: #879bb2; font-size: 10px; }
+.interview-summary > header .ghost { color: #dbe7f5; border-color: #3b5069; }
+.interview-summary-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr); }
+.interview-summary-grid > article, .interview-summary-grid > aside { padding: 30px 34px; }
+.interview-summary-grid > aside { border-left: 1px solid var(--line); background: var(--surface-subtle); }
+.summary-copy { margin-top: 18px; color: var(--ink); font-size: 12px; line-height: 1.9; white-space: pre-wrap; }
+.summary-node { padding: 14px 0; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 28px 1fr; gap: 10px; }
+.summary-node > b { color: var(--primary-blue); font-family: var(--font-geist-mono); font-size: 9px; }
+.summary-node div { display: grid; gap: 4px; }
+.summary-node strong { font-size: 11px; }
+.summary-node small, .interview-summary-grid aside > p { color: var(--muted); font-size: 9px; }
+
 @media (max-width: 1100px) {
   .page-wrap { padding: 22px 22px 46px; }
   .cohort-open { grid-template-columns: minmax(170px,1fr) 160px auto; }
@@ -715,7 +796,7 @@ html[data-theme="dark"] .mobile-brand { color: var(--ink)!important; }
   .theme-switch select { width: 64px; min-height: 40px; }
   .cohort-switch select { width: min(150px, 39vw); min-height: 40px; }
   .page-wrap { padding: 12px 12px 78px; }
-  .mobile-nav { height: 58px; background: color-mix(in srgb, var(--surface) 95%, transparent); border-color: var(--line); backdrop-filter: blur(14px); }
+  .mobile-nav { height: 58px; grid-template-columns: repeat(5, 1fr); background: color-mix(in srgb, var(--surface) 95%, transparent); border-color: var(--line); backdrop-filter: blur(14px); }
   .mobile-nav button { color: var(--muted); min-height: 44px; }
   .mobile-nav button.active { color: var(--primary-blue); box-shadow: inset 0 2px var(--primary-blue); }
   .page-title { padding: 0 0 13px; gap: 15px; }
@@ -749,4 +830,34 @@ html[data-theme="dark"] .mobile-brand { color: var(--ink)!important; }
   .cohort-open b { margin-top: 4px; }
   .cohort-actions { min-width: 78px; flex-direction: column; align-items: end; }
   input, select, textarea, .primary, .ghost, .save-button { min-height: 40px; }
+  .toolbox-entry { display: none; }
+  .page-wrap:has(.toolbox-page) { padding-bottom: 70px; }
+  .toolbox-page { height: calc(100dvh - 138px); }
+  .toolbox-page > .page-title { display: none; }
+  .interview-shell { height: 100%; min-height: 0; max-height: none; border-radius: 8px; }
+  .interview-intro { display: block; overflow-y: auto; }
+  .interview-intro-copy { min-height: 310px; padding: 38px 24px; }
+  .interview-intro-copy h2 { margin: 14px 0; font-size: 46px; }
+  .interview-intro-copy dl { padding-top: 28px; }
+  .interview-intro-copy dl div { padding: 9px; }
+  .interview-intro-copy dd { font-size: 9px; }
+  .interview-start-panel { padding: 28px 22px 36px; }
+  .interview-chat > header { padding: 8px 10px; }
+  .interview-chat > header > div { gap: 6px; }
+  .interview-chat > header > div:first-child strong { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .interview-chat > header button { padding: 6px 8px; }
+  .interview-chat > header time { display: none; }
+  .interview-workspace { display: block; position: relative; }
+  .interview-conversation { height: 100%; padding: 20px 12px; }
+  .interview-conversation article { grid-template-columns: 27px minmax(0,1fr); gap: 7px; }
+  .interview-conversation article.user { grid-template-columns: minmax(0,1fr) 27px; }
+  .interview-conversation article p { max-width: 94%; font-size: 12px; }
+  .interview-nodes { position: absolute; inset: 0 0 0 auto; width: min(340px, 92%); border-left: 1px solid var(--line); box-shadow: -18px 0 40px rgba(0,0,0,.18); z-index: 2; }
+  .interview-input { grid-template-columns: minmax(0,1fr) 58px; padding: 9px; }
+  .interview-summary > header { padding: 24px 20px; align-items: start; }
+  .interview-summary > header h2 { font-size: 25px; }
+  .interview-summary > header .ghost { padding: 8px 10px; font-size: 9px; }
+  .interview-summary-grid { grid-template-columns: 1fr; }
+  .interview-summary-grid > article, .interview-summary-grid > aside { padding: 24px 20px; }
+  .interview-summary-grid > aside { border-left: 0; border-top: 1px solid var(--line); }
 }

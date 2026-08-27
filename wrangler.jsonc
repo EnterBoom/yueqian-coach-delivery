@@ -10,7 +10,9 @@
   "vars": {
     "CF_ACCESS_AUD": "ce384f70478c755fc66b677d03e2a3c5591b13a8224110ba48e871c9a238c3bd",
     "CF_ACCESS_TEAM_DOMAIN": "vanya-ops.cloudflareaccess.com",
-    "INITIAL_OWNER_EMAIL": "729685219@qq.com"
+    "INITIAL_OWNER_EMAIL": "729685219@qq.com",
+    "INTERVIEW_LLM_BASE_URL": "https://api.deepseek.com/v1",
+    "INTERVIEW_LLM_MODEL": "deepseek-chat"
   },
   "d1_databases": [
     {

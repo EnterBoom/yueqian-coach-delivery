@@ -14,6 +14,7 @@ npm run dev
 
 - `app/operations-app.tsx`：业务界面。
 - `app/api/workspace/route.ts`：服务端接口与权限校验。
+- `app/interview-tool.tsx`、`app/api/interview/route.ts`：工具箱内的 AI 人设深访界面与服务端模型代理。
 - `app/access-auth.ts`：Cloudflare Access 登录身份读取。
 - `db/schema.ts`、`drizzle/`：D1 数据结构与迁移。
 - `lib/policy.mjs`：分组权限和验收证据校验。
@@ -27,6 +28,14 @@ npm run dev
 - `INITIAL_OWNER_EMAIL=729685219@qq.com`
 - `CF_ACCESS_TEAM_DOMAIN=<team>.cloudflareaccess.com`
 - `CF_ACCESS_AUD=<Access application audience>`
+- `INTERVIEW_LLM_BASE_URL=https://api.deepseek.com/v1`
+- `INTERVIEW_LLM_MODEL=deepseek-chat`
+
+访谈模型密钥只作为 Worker Secret 保存，不要写入 `wrangler.jsonc` 或 GitHub：
+
+```bash
+npx wrangler secret put DEEPSEEK_API_KEY --name yueqian-coach-ops-prod
+```
 
 Access 允许邮箱完成一次性验证码身份验证；真正的数据权限由应用内 `members`、角色和分组关系控制。未登记邮箱通过验证后仍会被服务端拒绝。生产 Worker 名称和 D1 绑定见 `wrangler.jsonc`。
 
@@ -46,4 +55,4 @@ Access 允许邮箱完成一次性验证码身份验证；真正的数据权限�
 
 ## 当前产品边界
 
-暂不包含学员端、文件上传、站内聊天、消息通知、飞书自动同步、绩效管理和多期营复用后台。
+工具箱现包含文字版“跃迁 AI 人设深访”，访谈会话保存在当前浏览器，不进入 D1。暂不包含语音访谈、学员端、文件上传、站内聊天、消息通知、飞书自动同步和绩效管理。
