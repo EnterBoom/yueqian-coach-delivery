@@ -1,6 +1,7 @@
 import { ensureSchema, getD1 } from "@/db";
 import { buildInterviewPrompt, buildInterviewSummaryPrompt, parseInterviewReply } from "@/lib/interview.mjs";
 import { getSiteUser } from "@/lib/site-auth";
+import { env } from "cloudflare:workers";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +46,19 @@ async function authorizeMember() {
 }
 
 async function callModel(body: Array<{ role: string; content: string }>, temperature: number) {
-  const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+  const runtimeEnv = env as unknown as {
+    DEEPSEEK_API_KEY?: string;
+    INTERVIEW_LLM_BASE_URL?: string;
+    INTERVIEW_LLM_MODEL?: string;
+  };
+  const apiKey = runtimeEnv.DEEPSEEK_API_KEY?.trim();
   if (!apiKey) throw Object.assign(new Error("访谈模型尚未配置，请联系项目负责人"), { status: 503 });
-  const baseUrl = (process.env.INTERVIEW_LLM_BASE_URL || "https://api.deepseek.com/v1").replace(/\/$/, "");
+  const baseUrl = (runtimeEnv.INTERVIEW_LLM_BASE_URL || "https://api.deepseek.com/v1").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: process.env.INTERVIEW_LLM_MODEL || "deepseek-chat",
+      model: runtimeEnv.INTERVIEW_LLM_MODEL || "deepseek-chat",
       messages: body,
       temperature,
       max_tokens: 1200,
