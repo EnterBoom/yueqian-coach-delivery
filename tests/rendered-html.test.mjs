@@ -165,3 +165,10 @@ test("the interview experiment is an authenticated internal toolbox", async () =
   assert.match(prompt, /九宫格话题骨架/);
   assert.match(wrangler, /INTERVIEW_LLM_MODEL/);
 });
+
+test("users can recover from an incorrect Cloudflare Access account", async () => {
+  const client = await readFile(new URL("../app/operations-app.tsx", import.meta.url), "utf8");
+  assert.match(client, /\/cdn-cgi\/access\/logout/);
+  assert.match(client, /退出并切换邮箱/);
+  assert.match(client, /切换账号/);
+});
