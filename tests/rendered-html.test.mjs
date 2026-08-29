@@ -157,6 +157,8 @@ test("the interview experiment is an authenticated internal toolbox", async () =
   ]);
   assert.match(client, /工具箱/);
   assert.match(client, /InterviewTool/);
+  assert.match(client, /这里是工具入口，不是单个工具页面/);
+  assert.match(client, /返回工具箱/);
   assert.match(tool, /AI 人设深访/);
   assert.match(tool, /yueqian-interview-session-v1/);
   assert.match(route, /SELECT email FROM members WHERE email=\?/);

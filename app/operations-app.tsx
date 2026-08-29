@@ -107,7 +107,7 @@ export function OperationsApp() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-seal">跃</span><div><strong>跃迁计划</strong><small>教练交付作战台 <span className="version-tag">v{packageJson.version}</span></small></div></div>
       <nav aria-label="主导航">{nav.map(([key, number, label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}><span>{number}</span>{label}</button>)}</nav>
-      <button className={`toolbox-entry ${tab === "tools" ? "active" : ""}`} onClick={() => setTab("tools")}><span aria-hidden="true">⌘</span><div><strong>工具箱</strong><small>AI 人设深访</small></div></button>
+      <button className={`toolbox-entry ${tab === "tools" ? "active" : ""}`} onClick={() => setTab("tools")}><span aria-hidden="true">⌘</span><div><strong>工具箱</strong><small>AI 工作工具</small></div></button>
       <section className="sidebar-controls" aria-label="工作台设置"><div className="sidebar-live"><span className={`live-dot ${readOnly ? "archived" : ""}`}/>{readOnly ? "历史营期" : "营期协同中"}</div><label>当前营期<select aria-label="侧栏当前营期" value={snapshot.cohort.id} onChange={(event) => switchCohort(Number(event.target.value))} disabled={busy}>{snapshot.cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.name}{cohort.status === "archived" ? " · 已归档" : ""}</option>)}</select></label><label>界面主题<select aria-label="侧栏界面主题" value={themePreference} onChange={(event) => changeTheme(event.target.value as ThemePreference)}><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label><button onClick={refresh} aria-label="刷新工作台数据">刷新数据</button></section>
       <div className="sidebar-foot"><div className="avatar">{snapshot.user.displayName.slice(0, 1).toUpperCase()}</div><div><strong>{snapshot.user.displayName}</strong><small>{snapshot.user.role === "owner" ? "项目负责人" : "带组教练"}</small><a href={ACCESS_LOGOUT_URL}>切换账号</a></div></div>
     </aside>
@@ -247,5 +247,28 @@ function GroupAdminRow({ group, groups, busy, readOnly, mutate }: { group: Group
 }
 
 function PageTitle({ kicker, title, detail, action }: { kicker: string; title: string; detail: string; action?: React.ReactNode }) { return <div className="page-title"><div><span className="kicker">{kicker}</span><h1>{title}</h1><p>{detail}</p></div>{action}</div>; }
-function Toolbox() { return <section className="content-page toolbox-page"><PageTitle kicker="YUEQIAN TOOLS" title="工具箱" detail="把访谈、素材整理等独立能力放进同一个工作台。"/><InterviewTool/></section>; }
+function Toolbox() {
+  const [activeTool, setActiveTool] = useState<"interview" | null>(null);
+
+  if (activeTool === "interview") return <section className="content-page toolbox-page toolbox-tool-view">
+    <header className="tool-view-bar">
+      <button type="button" onClick={() => setActiveTool(null)}><span aria-hidden="true">←</span> 返回工具箱</button>
+      <div><span className="tool-status">正在使用</span><strong>AI 人设深访</strong></div>
+    </header>
+    <InterviewTool/>
+  </section>;
+
+  return <section className="content-page toolbox-page toolbox-home">
+    <PageTitle kicker="YUEQIAN TOOLS" title="工具箱" detail="把访谈、素材整理等独立能力放进同一个工作台。"/>
+    <div className="tool-catalog">
+      <button type="button" className="tool-card featured" onClick={() => setActiveTool("interview")}>
+        <span className="tool-card-index">01</span>
+        <div className="tool-card-mark" aria-hidden="true">访</div>
+        <div className="tool-card-copy"><span className="tool-status">已上线</span><h2>AI 人设深访</h2><p>通过连续追问捕捉真实经历、关键转折和故事节点，沉淀可继续整理的人设素材。</p></div>
+        <span className="tool-card-action">进入工具 <b aria-hidden="true">→</b></span>
+      </button>
+      <aside className="tool-catalog-note"><span>TOOLBOX · 01</span><strong>这里是工具入口，不是单个工具页面</strong><p>后续新增的素材整理、任务辅助等能力会继续排列在这里，各自独立进入、独立返回。</p></aside>
+    </div>
+  </section>;
+}
 function Empty({ title, detail }: { title: string; detail: string }) { return <div className="empty"><span>○</span><strong>{title}</strong><p>{detail}</p></div>; }
