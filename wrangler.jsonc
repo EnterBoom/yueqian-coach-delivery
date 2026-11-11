@@ -3,7 +3,9 @@
   "name": "yueqian-coach-ops-prod",
   "main": "./worker/index.ts",
   "compatibility_date": "2026-05-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "preview_urls": false,
   "keep_vars": true,
@@ -12,7 +14,14 @@
     "CF_ACCESS_TEAM_DOMAIN": "vanya-ops.cloudflareaccess.com",
     "INITIAL_OWNER_EMAIL": "729685219@qq.com",
     "INTERVIEW_LLM_BASE_URL": "https://api.deepseek.com/v1",
-    "INTERVIEW_LLM_MODEL": "deepseek-chat"
+    "INTERVIEW_LLM_MODEL": "deepseek-chat",
+    "FEISHU_APP_ID": "cli_aa4eca6e2238dbe2",
+    "FEISHU_BASE_TOKEN": "QW9VbY89pa1zocsZH1BcEFXan9b",
+    "FEISHU_REGISTRATION_TABLE": "tblEkrELkr1h4Q3L",
+    "FEISHU_REFUND_TABLE": "tbljPZ0mVouYk7Rd",
+    "FEISHU_BASE_URL": "https://mcnbg0q6hqki.feishu.cn/base/QW9VbY89pa1zocsZH1BcEFXan9b",
+    "FEISHU_REGISTRATION_FORM_URL": "https://mcnbg0q6hqki.feishu.cn/share/base/shrcnUqs6syHUphfsgtuXrbZgdb",
+    "FEISHU_REFUND_FORM_URL": "https://mcnbg0q6hqki.feishu.cn/share/base/shrcn6zw7Yy96BG53UGhXu7rpRc"
   },
   "d1_databases": [
     {
@@ -24,5 +33,10 @@
   ],
   "observability": {
     "enabled": true
+  },
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
   }
 }

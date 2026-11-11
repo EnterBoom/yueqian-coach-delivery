@@ -9,7 +9,7 @@ export type SiteUser = { userId: string; email: string; displayName: string };
 export type Member = { email: string; user_id: string | null; display_name: string; role: Role };
 export type Cohort = { id: number; name: string; pre_start_date: string; offline_start_date: string; post_start_date: string; status: "active" | "archived"; archived_at: string | null; archived_by: string | null };
 export type Group = { id: number; name: string; coach_email: string; coach_name: string; learner_count: number };
-export type Learner = { id: number; name: string; group_id: number; group_name: string; note: string };
+export type Learner = { id: number; name: string; group_id: number; group_name: string; note: string; handoff?: { nickname: string; phone: string; promise: string; sales_name: string; delivery_note: string; status: string; inactive: boolean } };
 export type DayPlan = {
   id: number;
   cohort_id: number;

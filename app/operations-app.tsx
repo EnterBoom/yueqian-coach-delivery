@@ -1,13 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AdmissionsPanel } from "@/app/admissions-panel";
 import { InterviewTool } from "@/app/interview-tool";
 import { defaultDayId } from "@/lib/day-view.mjs";
 import { isThemePreference, resolveTheme, THEME_STORAGE_KEY } from "@/lib/theme.mjs";
 import type { DayPlan, DeliveryException, Group, Learner, PlanSource, ProgressStatus, WorkspaceSnapshot } from "@/lib/types";
 import packageJson from "@/package.json";
 
-type Tab = "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings" | "tools";
+type Tab = "admissions" | "overview" | "learners" | "exceptions" | "plan" | "cohorts" | "settings" | "tools";
 type ThemePreference = "system" | "light" | "dark";
 type Mutate = (payload: Record<string, unknown>, message: string) => Promise<boolean>;
 const ACCESS_LOGOUT_URL = "https://vanya-ops.cloudflareaccess.com/cdn-cgi/access/logout";
@@ -52,13 +53,13 @@ export function OperationsApp() {
   };
   useEffect(() => {
     let active = true;
-    api().then((data) => { if (active) setSnapshot(data); }).catch((problem) => { if (active) setError((problem as Error).message); });
+    api().then((data) => { if (active) { setSnapshot(data); if (new URLSearchParams(window.location.search).has("admission")) setTab("admissions"); } }).catch((problem) => { if (active) setError((problem as Error).message); });
     return () => { active = false; };
   }, []);
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      setThemePreference(isThemePreference(stored) ? stored : "system");
+      setThemePreference(isThemePreference(stored) ? stored as ThemePreference : "system");
       setThemeReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -101,7 +102,7 @@ export function OperationsApp() {
   if (!snapshot.cohort) return <div className="center-state"><div className="state-mark">○</div><h1>暂未分配营期</h1><p>请联系项目负责人，把你添加到对应营期的小组。</p><div className="auth-recovery"><button onClick={refresh}>刷新</button><a href={ACCESS_LOGOUT_URL}>切换登录邮箱</a></div></div>;
   const readOnly = snapshot.cohort.status === "archived";
   const nav: Array<[Tab, string, string]> = [["overview", "01", "交付总览"], ["learners", "02", "学员推进"], ["exceptions", "03", "异常协同"], ["plan", "04", "教练任务"]];
-  if (snapshot.user.role === "owner") nav.push(["cohorts", "05", "营期管理"], ["settings", "06", "成员与分组"]);
+  if (snapshot.user.role === "owner") nav.push(["cohorts", "05", "营期管理"], ["settings", "06", "成员与分组"], ["admissions", "07", "报名与交接"]);
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -123,9 +124,10 @@ export function OperationsApp() {
         {tab === "cohorts" && snapshot.user.role === "owner" && <CohortManager snapshot={snapshot} busy={busy} mutate={mutate} switchCohort={switchCohort}/>} 
         {tab === "settings" && snapshot.user.role === "owner" && <Settings snapshot={snapshot} busy={busy} mutate={mutate} readOnly={readOnly}/>} 
         {tab === "tools" && <Toolbox/>}
+        {tab === "admissions" && snapshot.user.role === "owner" && <AdmissionsPanel/>}
       </div>
     </main>
-    <nav className="mobile-nav" aria-label="移动端导航">{nav.slice(0, 4).map(([key,,label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{label.replace("交付", "")}</button>)}<button className={tab === "tools" ? "active" : ""} onClick={() => setTab("tools")}>工具</button></nav>
+    <nav className="mobile-nav" aria-label="移动端导航">{nav.slice(0, 4).map(([key,,label]) => <button key={key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{label.replace("交付", "")}</button>)}<button className={tab === "tools" ? "active" : ""} onClick={() => setTab("tools")}>工具</button>{snapshot.user.role === "owner" && <button className={tab === "admissions" ? "active" : ""} onClick={() => setTab("admissions")}>报名</button>}</nav>
   </div>;
 }
 
@@ -200,9 +202,10 @@ function LearnerArchive({ snapshot }: { snapshot: WorkspaceSnapshot }) {
   return <div className="archive-list">{snapshot.learners.length ? snapshot.learners.map((learner) => { const records = snapshot.progress.filter((item) => item.learner_id === learner.id); const passed = records.filter((item) => item.status === "passed").length; return <details key={learner.id} className="archive-learner"><summary><div className="learner-name"><span>{learner.name.slice(0, 1)}</span><div><strong>{learner.name}</strong><small>{learner.group_name}{learner.note ? ` · ${learner.note}` : ""}</small></div></div><div><strong>{passed}/25 已通过</strong><small>{records.length} 天有记录</small></div></summary><div className="archive-days">{snapshot.dayPlans.map((day) => { const current = records.find((item) => item.day_plan_id === day.id); const status = current?.status ?? "not_started"; return <article key={day.id}><div><b>{day.label}</b><span className={`status-chip ${statusMeta[status].className}`}>{statusMeta[status].label}</span></div><strong>{day.title}</strong><p>{current?.evidence_note || "暂无验收记录"}</p>{current?.evidence_url && <a href={current.evidence_url} target="_blank" rel="noreferrer">查看作业证据 ↗</a>}</article>; })}</div></details>; }) : <Empty title="还没有学员档案" detail="导入学员并推进任务后，完整记录会沉淀在这里。"/>}</div>;
 }
 
-function ProgressEditor({ learner, dayId, current, busy, mutate, readOnly }: { learner: Learner; dayId: number; current?: WorkspaceSnapshot["progress"][number]; busy: boolean; readOnly: boolean; mutate: Mutate }) {
+function ProgressEditor({ learner, dayId, current, busy, mutate, readOnly: cohortReadOnly }: { learner: Learner; dayId: number; current?: WorkspaceSnapshot["progress"][number]; busy: boolean; readOnly: boolean; mutate: Mutate }) {
+  const readOnly = cohortReadOnly || Boolean(learner.handoff?.inactive);
   const [status, setStatus] = useState<ProgressStatus>(current?.status ?? "not_started"); const [url, setUrl] = useState(current?.evidence_url ?? ""); const [note, setNote] = useState(current?.evidence_note ?? "");
-  return <article className="learner-row"><div className="learner-name"><span>{learner.name.slice(0, 1)}</span><div><strong>{learner.name}</strong><small>{learner.group_name}{learner.note ? ` · ${learner.note}` : ""}</small></div></div><label className="compact-label">状态<select value={status} disabled={readOnly} onChange={(event) => setStatus(event.target.value as ProgressStatus)}>{Object.entries(statusMeta).map(([key, meta]) => <option value={key} key={key}>{meta.label}</option>)}</select></label><label className="compact-label grow">证据链接<input value={url} disabled={readOnly} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" inputMode="url"/></label><label className="compact-label grow">验收记录<input value={note} disabled={readOnly} onChange={(event) => setNote(event.target.value)} placeholder="写清已完成什么或需修改什么"/></label>{!readOnly && <button className="save-button" disabled={busy} onClick={() => mutate({ action: "update_progress", learnerId: learner.id, dayPlanId: dayId, status, evidenceUrl: url, evidenceNote: note }, `${learner.name} 的进度已保存`)}>保存</button>}</article>;
+  return <article className="learner-row"><div className="learner-name"><span>{learner.name.slice(0, 1)}</span><div><strong>{learner.name}</strong><small>{learner.group_name}{learner.note ? ` · ${learner.note}` : ""}</small>{learner.handoff && <details className="learner-handoff"><summary>报名交接 · {learner.handoff.status}</summary><p>{learner.handoff.nickname} · {learner.handoff.phone}</p><p>销售负责人 {learner.handoff.sales_name}</p><p>特别承诺 {learner.handoff.promise}</p><p>{learner.handoff.delivery_note}</p></details>}</div></div><label className="compact-label">状态<select value={status} disabled={readOnly} onChange={(event) => setStatus(event.target.value as ProgressStatus)}>{Object.entries(statusMeta).map(([key, meta]) => <option value={key} key={key}>{meta.label}</option>)}</select></label><label className="compact-label grow">证据链接<input value={url} disabled={readOnly} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" inputMode="url"/></label><label className="compact-label grow">验收记录<input value={note} disabled={readOnly} onChange={(event) => setNote(event.target.value)} placeholder="写清已完成什么或需修改什么"/></label>{!readOnly && <button className="save-button" disabled={busy} onClick={() => mutate({ action: "update_progress", learnerId: learner.id, dayPlanId: dayId, status, evidenceUrl: url, evidenceNote: note }, `${learner.name} 的进度已保存`)}>保存</button>}</article>;
 }
 
 function Exceptions({ snapshot, busy, mutate, readOnly }: { snapshot: WorkspaceSnapshot; busy: boolean; mutate: Mutate; readOnly: boolean }) {

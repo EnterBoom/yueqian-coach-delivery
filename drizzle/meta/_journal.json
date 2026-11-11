@@ -29,6 +29,13 @@
       "when": 1786677216377,
       "tag": "0003_illegal_calypso",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794415144925,
+      "tag": "0004_admissions",
+      "breakpoints": true
     }
   ]
 }

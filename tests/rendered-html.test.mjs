@@ -46,7 +46,7 @@ test("finished site has no starter or performance surface", async () => {
 });
 
 test("production owner bootstrap is explicit", async () => {
-  const route = await readFile(new URL("../app/api/workspace/route.ts", import.meta.url), "utf8");
+  const route = await readFile(new URL("../lib/workspace-auth.ts", import.meta.url), "utf8");
   assert.match(route, /INITIAL_OWNER_EMAIL/);
   assert.match(route, /NODE_ENV === "development"/);
   assert.match(route, /if \(!member\).*尚未分配项目角色/s);

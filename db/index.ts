@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema";
+import { ensureAdmissionSchema } from "../lib/admissions.mjs";
 
 let schemaReady: Promise<void> | null = null;
 
@@ -70,6 +71,7 @@ export function ensureSchema() {
       db.prepare("CREATE INDEX IF NOT EXISTS idx_day_plans_cohort_id ON day_plans(cohort_id)"),
       db.prepare("INSERT OR IGNORE INTO day_plan_publications (day_plan_id,title,coach_action,group_announcement,materials,learner_instructions,reminder,goal,deliverable,acceptance,due_date,published_by,published_at) SELECT id,title,coach_action,group_announcement,materials,learner_instructions,reminder,goal,deliverable,acceptance,due_date,'migration',updated_at FROM day_plans WHERE configured=1"),
     ]);
-  })();
+    await ensureAdmissionSchema(db);
+  })().catch((error) => { schemaReady = null; throw error; });
   return schemaReady;
 }

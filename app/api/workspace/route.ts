@@ -1,7 +1,7 @@
-import { ensureSchema, getD1 } from "@/db";
-import { getSiteUser } from "@/lib/site-auth";
+import { getD1 } from "@/db";
+import { authorizeWorkspace as authorize } from "@/lib/workspace-auth";
 import { parseLearnerRows } from "@/lib/import-learners.mjs";
-import type { DayPlan, Member, Phase, PlanSource, Role, WorkspaceSnapshot } from "@/lib/types";
+import type { DayPlan, Phase, PlanSource, Role, WorkspaceSnapshot } from "@/lib/types";
 import {
   assertCohortWritable,
   canAccessGroup,
@@ -71,19 +71,6 @@ function blankRows(starts: Record<Phase, string>): PlanSeed[] {
   return standardRows(starts).map((row) => [row[0], row[1], row[2], `待配置｜${row[2]}`, "", "", "", "", "", "", "", "", row[12], row[13], 0]);
 }
 
-async function authorize() {
-  const user = await getSiteUser();
-  if (!user) throw Object.assign(new Error("请先登录 ChatGPT 后再进入作战台"), { status: 401 });
-  await ensureSchema();
-  const db = getD1();
-  const initialOwnerEmail = process.env.INITIAL_OWNER_EMAIL?.trim().toLowerCase();
-  if (initialOwnerEmail) await db.prepare("INSERT OR IGNORE INTO members (email,display_name,role) VALUES (?,?,'owner')").bind(initialOwnerEmail, initialOwnerEmail).run();
-  else if (process.env.NODE_ENV === "development") await db.prepare("INSERT OR IGNORE INTO members (email,user_id,display_name,role) VALUES (?,?,?,'owner')").bind(user.email, user.userId, user.displayName).run();
-  const member = await db.prepare("SELECT email,user_id,display_name,role FROM members WHERE email=?").bind(user.email).first<Member>();
-  if (!member) throw Object.assign(new Error("该邮箱尚未分配项目角色"), { status: 403 });
-  await db.prepare("UPDATE members SET user_id=?,updated_at=CURRENT_TIMESTAMP WHERE email=?").bind(user.userId, user.email).run();
-  return { db, user: { ...user, displayName: member.display_name }, member };
-}
 
 async function availableCohorts(db: ReturnType<typeof getD1>, role: Role, email: string) {
   return (role === "owner"
@@ -144,10 +131,22 @@ async function snapshot(requestedCohortId?: number): Promise<WorkspaceSnapshot> 
     const placeholders = exceptionIds.map(() => "?").join(",");
     events = (await db.prepare(`SELECT * FROM exception_events WHERE exception_id IN (${placeholders}) ORDER BY created_at`).bind(...exceptionIds).all()).results;
   }
+  const learnerRows = learners.results as WorkspaceSnapshot["learners"];
+  const handoffSql = `SELECT p.learner_id,a.nickname,a.phone,a.promise,a.sales_name,a.delivery_note,a.status,
+    CASE WHEN a.learner_id IS NOT p.learner_id OR a.status IN ('延期待交付','已退费','已完成') THEN 1 ELSE 0 END inactive
+    FROM admission_placements p JOIN admissions a ON a.id=p.admission_id
+    JOIN learners l ON l.id=p.learner_id JOIN groups g ON g.id=l.group_id
+    WHERE g.cohort_id=?${owner ? "" : " AND g.coach_email=?"}`;
+  const handoffs = (await bind(handoffSql)).results;
+  const handoffByLearner = new Map(handoffs.map((item) => [Number(item.learner_id), item]));
+  for (const learner of learnerRows) {
+    const handoff = handoffByLearner.get(learner.id);
+    if (handoff) learner.handoff = { ...handoff, inactive: Boolean(handoff.inactive) } as NonNullable<typeof learner.handoff>;
+  }
   const showPublished = !owner || cohort.status === "archived";
   return {
     user: { ...user, role: member.role }, cohort, cohorts,
-    groups: groups.results as WorkspaceSnapshot["groups"], learners: learners.results as WorkspaceSnapshot["learners"],
+    groups: groups.results as WorkspaceSnapshot["groups"], learners: learnerRows,
     dayPlans: (days.results as D1Row[]).map((row) => resolvedDay(row, showPublished)), progress: progress.results as WorkspaceSnapshot["progress"],
     exceptions: exceptionRows.map((item) => ({ ...item, events: events.filter((event) => Number(event.exception_id) === Number(item.id)) })) as WorkspaceSnapshot["exceptions"],
     members: members.results as WorkspaceSnapshot["members"],
@@ -256,7 +255,7 @@ export async function POST(request: Request) {
       if (groups.length !== 2) throw new Error("小组不属于当前营期");
       const duplicate = await db.prepare("SELECT 1 FROM learners a JOIN learners b ON lower(a.name)=lower(b.name) WHERE a.group_id=? AND b.group_id=? LIMIT 1").bind(fromGroupId, toGroupId).first();
       if (duplicate) throw new Error("两个小组存在同名学员，请先处理重名记录");
-      await db.batch([db.prepare("UPDATE learners SET group_id=?,updated_at=CURRENT_TIMESTAMP WHERE group_id=?").bind(toGroupId, fromGroupId), db.prepare("UPDATE exceptions SET group_id=?,updated_at=CURRENT_TIMESTAMP WHERE group_id=?").bind(toGroupId, fromGroupId), db.prepare("DELETE FROM groups WHERE id=? AND cohort_id=?").bind(fromGroupId, cohort.id)]);
+      await db.batch([db.prepare("UPDATE learners SET group_id=?,updated_at=CURRENT_TIMESTAMP WHERE group_id=?").bind(toGroupId, fromGroupId), db.prepare("UPDATE exceptions SET group_id=?,updated_at=CURRENT_TIMESTAMP WHERE group_id=?").bind(toGroupId, fromGroupId), db.prepare("UPDATE admissions SET group_id=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE group_id=?").bind(toGroupId, fromGroupId), db.prepare("DELETE FROM groups WHERE id=? AND cohort_id=?").bind(fromGroupId, cohort.id)]);
     } else if (action === "import_learners") {
       const cohort = writableCohort!;
       if (!owner) throw Object.assign(new Error("只有项目方可以导入学员"), { status: 403 });
@@ -271,6 +270,9 @@ export async function POST(request: Request) {
       const dayPlanId = Number(body.dayPlanId);
       const learnerGroup = await groupForLearner(db, learnerId);
       if (!learnerGroup) throw new Error("学员不存在");
+      const inactive = await db.prepare(`SELECT 1 FROM admission_placements p JOIN admissions a ON a.id=p.admission_id
+        WHERE p.learner_id=? AND (a.learner_id IS NOT p.learner_id OR a.status IN ('延期待交付','已退费','已完成'))`).bind(learnerId).first();
+      if (inactive) throw new Error("该报名已转出或归档，历史交付记录只读");
       await requireGroupAccess(db, member.role, user.email, learnerGroup.id, cohort.id);
       const day = await db.prepare("SELECT d.id,p.day_plan_id published FROM day_plans d LEFT JOIN day_plan_publications p ON p.day_plan_id=d.id WHERE d.id=? AND d.cohort_id=?").bind(dayPlanId, cohort.id).first<{ id: number; published: number | null }>();
       if (!day || learnerGroup.cohort_id !== cohort.id) throw new Error("学员与任务不属于当前营期");
