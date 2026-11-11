@@ -22,7 +22,8 @@ export async function GET(request: Request) {
       "content-type": type, "cache-control": "private, no-store", "x-content-type-options": "nosniff",
       "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name || "附件")}`,
     } });
-  } catch {
-    return new Response("附件读取失败，请在飞书台账打开原附件，或检查机器人的文件下载权限。", { status: 502 });
+  } catch (error) {
+    const status = (error as Error & { status?: number }).status || 502;
+    return new Response(status === 401 ? "请登录后查看退费附件。" : "附件读取失败，请在飞书台账打开原附件，或检查机器人的文件下载权限。", { status });
   }
 }
